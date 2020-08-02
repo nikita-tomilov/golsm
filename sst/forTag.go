@@ -32,7 +32,7 @@ func (st *SSTforTag) InitStorage() {
 }
 
 func (st *SSTforTag) initOverNewFile() {
-	file, err := os.OpenFile(st.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(st.FileName, os.O_CREATE|os.O_WRONLY, 0644)
 	utils.Check(err)
 	st.file = file
 	st.mutex = &sync.Mutex{}
@@ -41,7 +41,15 @@ func (st *SSTforTag) initOverNewFile() {
 }
 
 func (st *SSTforTag) initOverExistingFile() {
-	panic("TODO: READ ALREADY EXISTING FILE")
+	file, err := os.OpenFile(st.FileName, os.O_APPEND|os.O_WRONLY, 0644)
+	utils.Check(err)
+	st.file = file
+	st.mutex = &sync.Mutex{}
+	st.currentMinimumTimestamp = ^uint64(0)
+	st.currentMaximumTimestamp = 0
+	st.iterateOverFileAndApplyForAllEntries(func (e Entry) {
+		tryOverrideRange(e, &(st.currentMinimumTimestamp), &(st.currentMaximumTimestamp))
+	})
 }
 
 func (st *SSTforTag) reopenFile() {
@@ -145,12 +153,12 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 			if commitlogEntry.Timestamp < sstEntry.Timestamp {
 				newSstEntry := Entry{Timestamp: commitlogEntry.Timestamp, ExpiresAt: commitlogEntry.ExpiresAt, Value: commitlogEntry.Value}
 				writeEntryToFile(newSstEntry, writer)
-				tryOverrideBorders(newSstEntry, &minTs, &maxTs)
+				tryOverrideRange(newSstEntry, &minTs, &maxTs)
 				idx++
 			}
 		}
 		writeEntryToFile(sstEntry, writer)
-		tryOverrideBorders(sstEntry, &minTs, &maxTs)
+		tryOverrideRange(sstEntry, &minTs, &maxTs)
 	})
 
 	//over still unprocessed new commitlog entries, if there are any
@@ -158,7 +166,7 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 		newEntry := commitlogEntries[idx]
 		sstEntry := Entry{Timestamp:newEntry.Timestamp, ExpiresAt:newEntry.ExpiresAt, Value:newEntry.Value}
 		writeEntryToFile(sstEntry, writer)
-		tryOverrideBorders(sstEntry, &minTs, &maxTs)
+		tryOverrideRange(sstEntry, &minTs, &maxTs)
 		idx += 1
 	}
 
@@ -186,7 +194,7 @@ func writeEntryToFile(e Entry, w *bufio.Writer) {
 	log.Debug("Wrote entry " + e.ToString())
 }
 
-func tryOverrideBorders(e Entry, minTs *uint64, maxTs *uint64) {
+func tryOverrideRange(e Entry, minTs *uint64, maxTs *uint64) {
 	if e.Timestamp < *minTs {
 		*minTs = e.Timestamp
 	}

@@ -30,6 +30,17 @@ func TestSSTforTag_SanityCheck(t *testing.T) {
 	assert.Equal(t, uint64(1337), min, "min ts incorrect")
 	assert.Equal(t, uint64(1343), max, "max ts incorrect")
 
+	//given
+	st = SSTforTag{FileName: st.FileName}
+	st.InitStorage()
+
+	//when
+	min, max = st.GetFileRange()
+
+	//then
+	assert.Equal(t, uint64(1337), min, "min ts incorrect after file reopening")
+	assert.Equal(t, uint64(1343), max, "max ts incorrect after file reopening")
+
 	//when
 	actualEntries2 := getDummyCommitlogEntries2()
 	st.MergeWithCommitlog(actualEntries2)
