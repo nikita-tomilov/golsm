@@ -8,27 +8,27 @@ import (
 
 func TestCommitlog(t *testing.T) {
 	//given
-	m := commitlog.CommitlogManager{Path: "/tmp/golsm/test"}
+	m := commitlog.Manager{Path: "/tmp/golsm/test"}
 	m.Init()
-	dummy1 := commitlog.CommitlogEntry{
+	dummy1 := commitlog.Entry{
 		Key:       0,
 		Timestamp: 1337,
 		Value:     make([]byte, 2),
 		ExpiresAt: 9999,
 	}
-	dummy2 := commitlog.CommitlogEntry{
+	dummy2 := commitlog.Entry{
 		Key:       1,
 		Timestamp: 1489,
 		Value:     make([]byte, 3),
 		ExpiresAt: 9999,
 	}
-	dummy3 := commitlog.CommitlogEntry{
+	dummy3 := commitlog.Entry{
 		Key:       2,
 		Timestamp: 1490,
 		Value:     make([]byte, 4),
 		ExpiresAt: 9999,
 	}
-	dummy4 := commitlog.CommitlogEntry{
+	dummy4 := commitlog.Entry{
 		Key:       4,
 		Timestamp: 1338,
 		Value:     make([]byte, 2),

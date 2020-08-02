@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
-	"log"
+	log "github.com/jeanphorn/log4go"
 	"os"
+	"time"
 )
+
+const WhenceRelativeToEndOfFile = 2
 
 func ToString(e interface{}) string {
 	b, err := json.Marshal(e)
@@ -22,7 +25,7 @@ func ToNetworkByteArray(e interface{}) []byte {
 	//var dec = gob.NewDecoder(&network) // Will read from network.
 	err := enc.Encode(e)
 	if err != nil {
-		log.Fatal("encode error:", err)
+		log.Error("encode error:", err)
 	}
 	b := network.Bytes()
 	return append([]byte{byte(len(b))}, b...)
@@ -37,7 +40,7 @@ func FromNetworkByteArray(arr []byte, x interface{}) (interface{}, error) {
 	dec := gob.NewDecoder(network) // Will read from network.
 	err := dec.Decode(x)
 	if err != nil {
-		log.Fatal("decode error:", err)
+		log.Error("decode error:", err)
 		return nil, err
 	}
 	return x, nil
@@ -45,7 +48,7 @@ func FromNetworkByteArray(arr []byte, x interface{}) (interface{}, error) {
 
 func Check(e error) {
 	if e != nil {
-		log.Fatal(e)
+		log.Error(e)
 		panic(e)
 	}
 }
@@ -56,4 +59,8 @@ func FileExists(filename string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+func GetNowMillis() uint64 {
+	return uint64(time.Now().UnixNano() / 1000000)
 }

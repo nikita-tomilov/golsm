@@ -1,4 +1,4 @@
-package commitlog
+package sst
 
 import (
 	"encoding/binary"
@@ -6,7 +6,6 @@ import (
 )
 
 type Entry struct {
-	Key       uint16
 	Timestamp uint64
 	ExpiresAt uint64
 	Value     []byte
@@ -21,13 +20,10 @@ func (e *Entry) ToString() string {
 }
 
 func FromByteArray(arr []uint8) Entry {
-	//valueLen := len(arr) - 2 - 8 - 8
-	key := binary.LittleEndian.Uint16(arr)
-	timestamp := binary.LittleEndian.Uint64(arr[2:])
-	expiresAt := binary.LittleEndian.Uint64(arr[10:])
-	value := arr[18:]
+	timestamp := binary.LittleEndian.Uint64(arr)
+	expiresAt := binary.LittleEndian.Uint64(arr[8:])
+	value := arr[16:]
 	return Entry{
-		Key:       key,
 		Timestamp: timestamp,
 		ExpiresAt: expiresAt,
 		Value:     value,
@@ -35,12 +31,11 @@ func FromByteArray(arr []uint8) Entry {
 }
 
 func (e *Entry) ToByteArray() []uint8 {
-	len := len(e.Value) + 2 + 8 + 8
-	arr := make([]byte, len)
-	binary.LittleEndian.PutUint16(arr, e.Key)
-	binary.LittleEndian.PutUint64(arr[2:], e.Timestamp)
-	binary.LittleEndian.PutUint64(arr[10:], e.ExpiresAt)
-	copy(arr[18:], e.Value)
+	entryLen := len(e.Value) + 8 + 8
+	arr := make([]byte, entryLen)
+	binary.LittleEndian.PutUint64(arr, e.Timestamp)
+	binary.LittleEndian.PutUint64(arr[8:], e.ExpiresAt)
+	copy(arr[16:], e.Value)
 	return arr
 }
 

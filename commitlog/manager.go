@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 )
 
-type CommitlogManager struct {
+type Manager struct {
 	Path            string
 	commitlogA      OverFile
 	commitlogB      OverFile
@@ -13,7 +13,7 @@ type CommitlogManager struct {
 	activeCommitlog atomic.Value
 }
 
-func (m *CommitlogManager) Init() {
+func (m *Manager) Init() {
 	os.MkdirAll(m.Path, os.ModePerm)
 
 	m.commitlogA = OverFile{commitlogFileName: m.Path + "/COMMITLOGA"}
@@ -26,17 +26,17 @@ func (m *CommitlogManager) Init() {
 	m.usingA = true
 }
 
-func (m *CommitlogManager) Store(entry CommitlogEntry) {
+func (m *Manager) Store(entry Entry) {
 	active := m.activeCommitlog.Load().(OverFile)
 	active.Store(entry)
 }
 
-func (m *CommitlogManager) RetrieveAll() []CommitlogEntry {
+func (m *Manager) RetrieveAll() []Entry {
 	active := m.activeCommitlog.Load().(OverFile)
 	return active.RetrieveAll()
 }
 
-func (m *CommitlogManager) SwapCommitlogs() {
+func (m *Manager) SwapCommitlogs() {
 	if m.usingA {
 		m.activeCommitlog.Store(m.commitlogB)
 	} else {

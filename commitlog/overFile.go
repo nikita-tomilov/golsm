@@ -8,8 +8,8 @@ import (
 
 type Commitlog interface {
 	Init()
-	Store(entry CommitlogEntry)
-	RetrieveAll() []CommitlogEntry
+	Store(entry Entry)
+	RetrieveAll() []Entry
 	Count() int
 }
 
@@ -27,13 +27,13 @@ func (o *OverFile) Init() {
 	o.commitlogFile = file
 }
 
-func (o *OverFile) Store(entry CommitlogEntry) {
+func (o *OverFile) Store(entry Entry) {
 	println("STORE on " + o.commitlogFileName)
 	o.commitlogFile.Write(entry.ToByteArrayWithLength())
 	o.entriesCount += 1
 }
 
-func (o *OverFile) RetrieveAll() []CommitlogEntry {
+func (o *OverFile) RetrieveAll() []Entry {
 	println("RETRIEVE ALL on " + o.commitlogFileName)
 	return o.readAllEntries()
 }
@@ -42,12 +42,12 @@ func (o *OverFile) Count() int {
 	return o.entriesCount
 }
 
-func (o *OverFile) readAllEntries() []CommitlogEntry {
+func (o *OverFile) readAllEntries() []Entry {
 	o.commitlogFile.Close()
 	f, err := os.OpenFile(o.commitlogFileName, os.O_RDONLY, 0644)
 	utils.Check(err)
 	buf := make([]byte, 2)
-	ans := make([]CommitlogEntry, 0)
+	ans := make([]Entry, 0)
 	n := 2
 	n, _ = f.Read(buf)
 	for n == 2 {
