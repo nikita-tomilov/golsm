@@ -1,0 +1,54 @@
+@startuml
+!include https://raw.githubusercontent.com/adrianvlupu/C4-PlantUML/latest/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title LSM storage architecture
+
+Boundary(storage, "LSM Storage system") {
+
+    Boundary(inmem, "In-memory storage") {
+        System(memtable, "MemTable", "Stores the in-memory small data snapshot")
+
+    }
+
+    Boundary(persistent, "Persistent storage") {
+
+        Boundary(commitlog_system, "CommitLog") {
+            System(commitlogManager, "CommitLog Manager", "A system that manages current opened commitlog")
+            SystemDb(commitlogA, "CommitLog-A", "Stores the unsorted log of the added data, in the order of appearance")
+            SystemDb(commitlogB, "CommitLog-B", "A secondary commitlog used when the first one is being flushed on disk")
+        }
+
+        System(sstable, "SSTable", "Stores the data on disk in separate files, one file per tag, having the key of timestamp")
+        SystemDb(dbfile1, "SSTable file 1", "")
+        SystemDb(dbfile2, "SSTable file 2", "")
+        SystemDb(dbfile3, "SSTable file ...", "")
+    }
+
+    System(dbwriter, "DBWriter", "Writes the commitlog to SSTables")
+    System(dbreader, "DBReader", "Indexes the SSTables")
+
+    System(swriter, "StorageWriter", "Contains the storage writing logic")
+    System(sreader, "StorageReader", "Contains the storage reading logic")
+}
+
+
+Rel(sstable, dbfile1, "The data for the first tag")
+Rel(sstable, dbfile2, "The data for the second tag")
+Rel(sstable, dbfile3, "...")
+
+Rel(commitlogManager, commitlogA, "Writes the data to")
+Rel(commitlogManager, commitlogB, "Writes the data to")
+
+Rel(dbwriter, commitlogManager, "Reads the commit log")
+Rel(dbwriter, sstable, "Applies the commitlog data to SSTables")
+Rel(dbreader, sstable, "Reads and indexes data from SSTables")
+
+Rel(swriter, commitlogManager, "Sends the written data to commitlog")
+Rel(swriter, memtable, "Sends the written data to MemTable")
+
+Rel(sreader, memtable, "Retrieves the data from MemTable")
+Rel(sreader, dbreader, "Retrieves the data from SSTables")
+
+@enduml
