@@ -2,6 +2,7 @@ package commitlog
 
 import (
 	"encoding/binary"
+	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/utils"
 	"os"
 )
@@ -20,7 +21,7 @@ type OverFile struct {
 }
 
 func (o *OverFile) Init() {
-	println("INIT on " + o.commitlogFileName)
+	log.Debug("INIT on " + o.commitlogFileName)
 
 	file, err := os.OpenFile(o.commitlogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	utils.Check(err)
@@ -28,13 +29,13 @@ func (o *OverFile) Init() {
 }
 
 func (o *OverFile) Store(entry Entry) {
-	println("STORE on " + o.commitlogFileName)
+	log.Debug("STORE on " + o.commitlogFileName)
 	o.commitlogFile.Write(entry.ToByteArrayWithLength())
 	o.entriesCount += 1
 }
 
 func (o *OverFile) RetrieveAll() []Entry {
-	println("RETRIEVE ALL on " + o.commitlogFileName)
+	log.Debug("RETRIEVE ALL on " + o.commitlogFileName)
 	return o.readAllEntries()
 }
 

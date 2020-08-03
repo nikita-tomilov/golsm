@@ -11,25 +11,25 @@ func TestCommitlog(t *testing.T) {
 	m := commitlog.Manager{Path: "/tmp/golsm/test"}
 	m.Init()
 	dummy1 := commitlog.Entry{
-		Key:       0,
+		Key:       []byte("tagZero"),
 		Timestamp: 1337,
 		Value:     make([]byte, 2),
 		ExpiresAt: 9999,
 	}
 	dummy2 := commitlog.Entry{
-		Key:       1,
+		Key:       []byte("tagOne"),
 		Timestamp: 1489,
 		Value:     make([]byte, 3),
 		ExpiresAt: 9999,
 	}
 	dummy3 := commitlog.Entry{
-		Key:       2,
+		Key:       []byte("tagTwo"),
 		Timestamp: 1490,
 		Value:     make([]byte, 4),
 		ExpiresAt: 9999,
 	}
 	dummy4 := commitlog.Entry{
-		Key:       4,
+		Key:       []byte("tagThree"),
 		Timestamp: 1338,
 		Value:     make([]byte, 2),
 		ExpiresAt: 9999,

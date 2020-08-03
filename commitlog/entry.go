@@ -6,7 +6,7 @@ import (
 )
 
 type Entry struct {
-	Key       uint16
+	Key       []byte
 	Timestamp uint64
 	ExpiresAt uint64
 	Value     []byte
@@ -21,11 +21,11 @@ func (e *Entry) ToString() string {
 }
 
 func FromByteArray(arr []uint8) Entry {
-	//valueLen := len(arr) - 2 - 8 - 8
-	key := binary.LittleEndian.Uint16(arr)
-	timestamp := binary.LittleEndian.Uint64(arr[2:])
-	expiresAt := binary.LittleEndian.Uint64(arr[10:])
-	value := arr[18:]
+	keyLen := binary.LittleEndian.Uint16(arr)
+	key := arr[2:(keyLen + 2)]
+	timestamp := binary.LittleEndian.Uint64(arr[(keyLen + 2):])
+	expiresAt := binary.LittleEndian.Uint64(arr[(keyLen + 10):])
+	value := arr[(keyLen + 18):]
 	return Entry{
 		Key:       key,
 		Timestamp: timestamp,
@@ -35,12 +35,14 @@ func FromByteArray(arr []uint8) Entry {
 }
 
 func (e *Entry) ToByteArray() []uint8 {
-	len := len(e.Value) + 2 + 8 + 8
-	arr := make([]byte, len)
-	binary.LittleEndian.PutUint16(arr, e.Key)
-	binary.LittleEndian.PutUint64(arr[2:], e.Timestamp)
-	binary.LittleEndian.PutUint64(arr[10:], e.ExpiresAt)
-	copy(arr[18:], e.Value)
+	keyLen := len(e.Key)
+	payloadLen := keyLen + len(e.Value) + 8 + 8 + 2
+	arr := make([]byte, payloadLen)
+	binary.LittleEndian.PutUint16(arr, uint16(keyLen))
+	copy(arr[2:], e.Key)
+	binary.LittleEndian.PutUint64(arr[(keyLen + 2):], e.Timestamp)
+	binary.LittleEndian.PutUint64(arr[(keyLen + 10):], e.ExpiresAt)
+	copy(arr[(keyLen + 18):], e.Value)
 	return arr
 }
 
