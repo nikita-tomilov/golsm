@@ -60,7 +60,38 @@ func TestSSTforTag_SanityCheck(t *testing.T) {
 	assert.Equal(t, uint64(1343), max, "max ts incorrect")
 	assert.Equal(t, uint64(1337), min2, "min ts incorrect after overriding/resorting merge")
 	assert.Equal(t, uint64(1345), max2, "max ts incorrect after overriding/resorting merge")
+}
 
+func TestSSTforTag_IndexWorks(t *testing.T) {
+	//given
+	st := SSTforTag{FileName: fmt.Sprintf("/tmp/golsm_test/testForTag-%d-%d.db", utils.GetNowMillis(), getTestIdx())}
+	st.InitStorage()
+
+	//when
+	actualEntries := getBigBatchOfEntries(1000, 1000, 0)
+	st.MergeWithCommitlog(actualEntries)
+	min, max := st.GetFileRange()
+
+	//then
+	assert.Equal(t, uint64(10000), min, "min ts incorrect")
+	assert.Equal(t, uint64(19990), max, "max ts incorrect")
+
+	//when
+	slice1 := st.GetEntriesWithoutIndex(15000, 16000)
+	//then
+	assert.Equal(t, 101, len(slice1), "entries count is incorrect without index")
+
+	//when
+	slice2 := st.GetEntriesWithIndex(15000, 16000)
+	//then
+	assert.Equal(t, 101, len(slice2), "entries count is incorrect with index")
+
+	for i := range slice1 {
+		assert.Equal(t, slice1[i], slice2[i], "entry is not the same when with and without index")
+	}
+}
+
+func Teardown(t *testing.T) {
 	log.Close()
 }
 
@@ -84,5 +115,18 @@ func getDummyCommitlogEntries2() []commitlog.Entry {
 	ans := make([]commitlog.Entry, 2)
 	ans[0] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1338, ExpiresAt: 0, Value: make([]byte, 4)}
 	ans[1] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1345, ExpiresAt: 3, Value: make([]byte, 2)}
+	return ans
+}
+func getBigBatchOfEntries(count int, firstTs uint64, delta uint64) []commitlog.Entry {
+	return getBigBatchOfEntriesOfSize(count, firstTs, delta, 4)
+}
+
+func getBigBatchOfEntriesOfSize(count int, firstTs uint64, delta uint64, size int) []commitlog.Entry {
+	ans := make([]commitlog.Entry, count)
+	i := 0
+	for i < count {
+		ans[i] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: (firstTs + uint64(i)) * 10 + delta, ExpiresAt: 1337, Value: make([]byte, size)}
+		i++
+	}
 	return ans
 }
