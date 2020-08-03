@@ -2,6 +2,7 @@ package sst
 
 import (
 	"fmt"
+	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/commitlog"
 	"github.com/nikita-tomilov/golsm/utils"
 	"github.com/stretchr/testify/assert"
@@ -10,7 +11,7 @@ import (
 
 func TestSSTforTag_SanityCheck(t *testing.T) {
 	//given
-	st := SSTforTag{FileName: fmt.Sprintf("/tmp/golsm_test/test%d%d.db", utils.GetNowMillis(), getTestIdx())}
+	st := SSTforTag{FileName: fmt.Sprintf("/tmp/golsm_test/testForTag-%d-%d.db", utils.GetNowMillis(), getTestIdx())}
 	st.InitStorage()
 
 	//when
@@ -59,6 +60,8 @@ func TestSSTforTag_SanityCheck(t *testing.T) {
 	assert.Equal(t, uint64(1343), max, "max ts incorrect")
 	assert.Equal(t, uint64(1337), min2, "min ts incorrect after overriding/resorting merge")
 	assert.Equal(t, uint64(1345), max2, "max ts incorrect after overriding/resorting merge")
+
+	log.Close()
 }
 
 var testIdx int = 1
@@ -70,16 +73,16 @@ func getTestIdx() int {
 
 func getDummyCommitlogEntries() []commitlog.Entry {
 	ans := make([]commitlog.Entry, 4)
-	ans[0] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1341, ExpiresAt: 0, Value: make([]byte, 4)}
-	ans[1] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1337, ExpiresAt: 3, Value: make([]byte, 2)}
-	ans[2] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1339, ExpiresAt: 6, Value: make([]byte, 16)}
+	ans[0] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1337, ExpiresAt: 0, Value: make([]byte, 4)}
+	ans[1] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1339, ExpiresAt: 3, Value: make([]byte, 2)}
+	ans[2] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1341, ExpiresAt: 6, Value: make([]byte, 16)}
 	ans[3] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1343, ExpiresAt: 9, Value: make([]byte, 1)}
 	return ans
 }
 
 func getDummyCommitlogEntries2() []commitlog.Entry {
 	ans := make([]commitlog.Entry, 2)
-	ans[0] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1345, ExpiresAt: 0, Value: make([]byte, 4)}
-	ans[1] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1338, ExpiresAt: 3, Value: make([]byte, 2)}
+	ans[0] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1338, ExpiresAt: 0, Value: make([]byte, 4)}
+	ans[1] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1345, ExpiresAt: 3, Value: make([]byte, 2)}
 	return ans
 }

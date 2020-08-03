@@ -8,7 +8,6 @@ import (
 	"github.com/nikita-tomilov/golsm/utils"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 )
 
@@ -101,9 +100,7 @@ func (st *SSTforTag) GetFileRange() (uint64, uint64) {
 }
 
 func (st *SSTforTag) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
-	sort.Slice(commitlogEntries, func (i, j int) bool {
-		return commitlogEntries[i].Timestamp < commitlogEntries[j].Timestamp
-	})
+	//TODO: maybe I should filter by tag directly here to avoid additional O(N)
 	minimalTimestamp := commitlogEntries[0].Timestamp
 	if st.currentMinimumTimestamp != 0 {
 		if minimalTimestamp >= st.currentMaximumTimestamp {
