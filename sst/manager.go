@@ -53,6 +53,10 @@ func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 	wg.Wait()
 }
 
+func (sm *Manager) ManagerForTag(tag string) *SSTforTag {
+	return sm.sstForTag[tag]
+}
+
 func applyEntriesForTag(wg *sync.WaitGroup, sm *Manager, tag string, entries []commitlog.Entry) {
 	defer wg.Done()
 

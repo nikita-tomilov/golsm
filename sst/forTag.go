@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 )
 
@@ -71,6 +72,9 @@ func (st *SSTforTag) GetAllEntries() []Entry {
 	ans := make([]Entry, 0)
 	st.iterateOverFileAndApplyForAllEntries(func(e Entry, o int64) {
 		ans = append(ans, e)
+	})
+	sort.Slice(ans, func(i, j int) bool {
+		return ans[i].Timestamp < ans[j].Timestamp
 	})
 	return ans
 }

@@ -64,3 +64,9 @@ func FileExists(filename string) bool {
 func GetNowMillis() uint64 {
 	return uint64(time.Now().UnixNano() / 1000000)
 }
+
+func DoEvery(d time.Duration, f func()) {
+	for range time.Tick(d) {
+		f()
+	}
+}

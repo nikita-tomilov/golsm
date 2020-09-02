@@ -5,6 +5,7 @@ import (
 	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/utils"
 	"os"
+	"strconv"
 )
 
 type Commitlog interface {
@@ -12,6 +13,7 @@ type Commitlog interface {
 	Store(entry Entry)
 	RetrieveAll() []Entry
 	Count() int
+	Clear()
 }
 
 type OverFile struct {
@@ -21,15 +23,13 @@ type OverFile struct {
 }
 
 func (o *OverFile) Init() {
-	log.Debug("INIT on " + o.commitlogFileName)
-
 	file, err := os.OpenFile(o.commitlogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	utils.Check(err)
 	o.commitlogFile = file
 }
 
 func (o *OverFile) Store(entry Entry) {
-	log.Debug("STORE on " + o.commitlogFileName)
+	log.Debug("STORE on " + o.commitlogFileName + " ts " + strconv.FormatUint(entry.Timestamp, 10))
 	o.commitlogFile.Write(entry.ToByteArrayWithLength())
 	o.entriesCount += 1
 }
@@ -64,4 +64,11 @@ func (o *OverFile) readAllEntries() []Entry {
 	f.Close()
 	o.Init()
 	return ans
+}
+
+func (o *OverFile) Clear() {
+	log.Debug("CLEAR on " + o.commitlogFileName)
+	o.commitlogFile.Close()
+	utils.Check(os.Remove(o.commitlogFileName))
+	o.Init()
 }

@@ -36,8 +36,8 @@ Boundary(storage, "LSM Storage system") {
         }
     }
 
-    Component(dbwriter, "DBWriter", "Golang", "Writes the commitlog to SSTables")
-    Component(dbreader, "DBReader", "Golang", "Indexes the SSTables")
+    Component(dbwriter, "DiskWriter", "Golang", "Writes the commitlog to SSTables")
+    Component(dbreader, "DiskReader", "Golang", "Indexes the SSTables")
 
     Component(swriter, "StorageWriter", "Golang", "Contains the storage writing logic")
     Component(sreader, "StorageReader", "Golang", "Contains the storage reading logic")

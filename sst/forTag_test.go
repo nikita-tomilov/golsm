@@ -11,7 +11,7 @@ import (
 
 func TestSSTforTag_SanityCheck(t *testing.T) {
 	//given
-	st := SSTforTag{FileName: fmt.Sprintf("/tmp/golsm_test/testForTag-%d-%d.db", utils.GetNowMillis(), getTestIdx())}
+	st := SSTforTag{FileName: fmt.Sprintf("/tmp/golsm_test/testForTag-%d-%d.db", utils.GetNowMillis(), utils.GetTestIdx())}
 	st.InitStorage()
 
 	//when
@@ -64,7 +64,7 @@ func TestSSTforTag_SanityCheck(t *testing.T) {
 
 func TestSSTforTag_IndexWorks(t *testing.T) {
 	//given
-	st := SSTforTag{FileName: fmt.Sprintf("/tmp/golsm_test/testForTag-%d-%d.db", utils.GetNowMillis(), getTestIdx())}
+	st := SSTforTag{FileName: fmt.Sprintf("/tmp/golsm_test/testForTag-%d-%d.db", utils.GetNowMillis(), utils.GetTestIdx())}
 	st.InitStorage()
 
 	//when
@@ -93,13 +93,6 @@ func TestSSTforTag_IndexWorks(t *testing.T) {
 
 func Teardown(t *testing.T) {
 	log.Close()
-}
-
-var testIdx int = 1
-
-func getTestIdx() int {
-	testIdx += 1
-	return testIdx
 }
 
 func getDummyCommitlogEntries() []commitlog.Entry {
