@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestManager_SanityCheck(t *testing.T) {
+func TestSSTManager_SanityCheck(t *testing.T) {
 	//given
 	m := Manager{RootDir: fmt.Sprintf("/tmp/golsm_test/test-for-SSTManager-%d-%d", utils.GetNowMillis(), utils.GetTestIdx())}
 	m.InitStorage()

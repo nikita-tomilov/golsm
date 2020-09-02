@@ -1,8 +1,7 @@
-package sst
+package memt
 
 import (
 	"bytes"
-	"github.com/btcsuite/btcutil/base58"
 	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/commitlog"
 	"sort"
@@ -10,17 +9,20 @@ import (
 )
 
 type Manager struct {
-	RootDir string
-	sstForTag map[string]*SSTforTag
-	mutex *sync.Mutex
+	sstForTag        map[string]*MemTforTag
+	mutex            *sync.Mutex
+	MaxEntriesPerTag int
 }
 
 func (sm *Manager) InitStorage() {
-	sm.sstForTag = make(map[string]*SSTforTag)
+	sm.sstForTag = make(map[string]*MemTforTag)
+	if sm.MaxEntriesPerTag == 0 {
+		sm.MaxEntriesPerTag = 10
+	}
 }
 
 func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
-	sort.Slice(commitlogEntries, func (i, j int) bool {
+	sort.Slice(commitlogEntries, func(i, j int) bool {
 		return bytes.Equal(commitlogEntries[i].Key, commitlogEntries[j].Key)
 	})
 
@@ -37,7 +39,7 @@ func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 		}
 		_, sstForTagExists := sm.sstForTag[tag]
 		if !sstForTagExists {
-			sst := SSTforTag{Tag:tag, FileName:sm.RootDir + "/" + base58.Encode(entry.Key)}
+			sst := MemTforTag{Tag: tag, MaxEntriesCount: sm.MaxEntriesPerTag}
 			sst.InitStorage()
 			sm.sstForTag[tag] = &sst
 		}
@@ -45,7 +47,7 @@ func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 
 	var wg sync.WaitGroup
 	for tag, entries := range groupedByTag {
-		log.Debug("Launching SST batch for tag %s", tag)
+		log.Debug("Launching MEMT batch for tag %s", tag)
 		wg.Add(1)
 		go applyEntriesForTag(&wg, sm, tag, entries)
 	}
@@ -53,7 +55,7 @@ func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 	wg.Wait()
 }
 
-func (sm *Manager) ManagerForTag(tag string) *SSTforTag {
+func (sm *Manager) MemTableForTag(tag string) *MemTforTag {
 	return sm.sstForTag[tag]
 }
 
