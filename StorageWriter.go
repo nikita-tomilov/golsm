@@ -1,14 +1,15 @@
-package writer
+package golsm
 
 import (
 	"github.com/nikita-tomilov/golsm/commitlog"
 	"github.com/nikita-tomilov/golsm/dto"
 	"github.com/nikita-tomilov/golsm/memt"
+	"github.com/nikita-tomilov/golsm/writer"
 	"sync"
 )
 
 type StorageWriter struct {
-	DiskWriter *DiskWriter
+	DiskWriter *writer.DiskWriter
 	MemTable   *memt.Manager
 	mutex      *sync.Mutex
 }

@@ -237,10 +237,12 @@ func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	ans := make([]Entry, count)
 	it := 0
 	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(entry Entry, i int64) {
-		ans[it] = entry
-		it++
+		if entry.Timestamp > 0 {
+			ans[it] = entry
+			it++
+		}
 	})
-	return ans
+	return ans[:it]
 }
 
 func writeEntryToFile(e Entry, w *bufio.Writer) int64 {
