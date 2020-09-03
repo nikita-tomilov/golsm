@@ -33,6 +33,33 @@ func (sr *StorageReader) Retrieve(tags []string, from uint64, to uint64) map[str
 	return ans
 }
 
+func (sr *StorageReader) Availability() (uint64, uint64) {
+	fromForMem, toForMem := sr.MemTable.Availability()
+	fromForSst, toForSst := sr.SSTManager.Availability()
+
+	return minNotZero(fromForMem, fromForSst), maxNotZero(toForMem, toForSst)
+}
+
+func minNotZero(a uint64, b uint64) uint64 {
+	if a == 0 {
+		return b
+	}
+	if (b == 0) || (a < b) {
+		return a
+	}
+	return b
+}
+
+func maxNotZero(a uint64, b uint64) uint64 {
+	if a == 0 {
+		return b
+	}
+	if (b == 0) || (a > b) {
+		return a
+	}
+	return b
+}
+
 //TODO: OPTIMIZE REGARDING AVAILABILITY (E.G. IF THE REQUESTED RANGE IS FULLY WITHIN MEMT, NO NEED TO USE SST)
 func retrieveDataForTag(wg *sync.WaitGroup, sr *StorageReader, tag string, from uint64, to uint64, res *map[string][]dto.Measurement) {
 	defer wg.Done()

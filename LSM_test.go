@@ -76,9 +76,12 @@ func TestLSM_StorageReaderWorks(t *testing.T) {
 	//when
 	storageWriter.Store(slice(dummyData, tagName, 0, 25), expiration)
 	retrievedData := storageReader.Retrieve(toList(tagName), 1336, 1500)
+	availFrom, availTo := storageReader.Availability()
 
 	//then
 	assert.Equal(t, 1, len(retrievedData), "weird stuff returned from StorageReader")
+	assert.Equal(t, dummyData[0].Timestamp, availFrom, "availFrom incorrect")
+	assert.Equal(t, dummyData[24].Timestamp, availTo, "availTo incorrect")
 	retrievedDataForTag := retrievedData[tagName]
 	assert.Equal(t, len(dummyData), len(retrievedDataForTag), "some dto was lost")
 	for i := 0; i < 25; i++ {

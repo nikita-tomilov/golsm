@@ -56,6 +56,26 @@ func (sm *Manager) MergeWithCommitlogForTag(tag string, entries []commitlog.Entr
 	st.MergeWithCommitlog(entries)
 }
 
+func (sm *Manager) Availability() (uint64, uint64) {
+	fromts := ^uint64(0)
+	tots := uint64(0)
+
+	for _, memtft := range sm.memtForTag {
+		f, t := memtft.Availability()
+		if fromts > f {
+			fromts = f
+		}
+		if tots < t {
+			tots = t
+		}
+	}
+
+	if tots == uint64(0) {
+		return 0, 0
+	}
+	return fromts, tots
+}
+
 func (sm *Manager) createMemtForTagIfNeeded(tag string) {
 	_, sstForTagExists := sm.memtForTag[tag]
 	if !sstForTagExists {

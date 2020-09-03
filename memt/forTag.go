@@ -43,6 +43,16 @@ func (mt *MemTforTag) RetrieveAll() []Entry {
 	return mt.Retrieve(0, ^uint64(0) - 1)
 }
 
+func (mt *MemTforTag) Availability() (uint64, uint64) {
+	min := mt.data.Min()
+	max := mt.data.Max()
+
+	mine := min.(*Entry)
+	maxe := max.(*Entry)
+
+	return mine.Timestamp, maxe.Timestamp
+}
+
 func (mt *MemTforTag) Retrieve(fromTs uint64, toTs uint64) []Entry {
 	ans := make([]Entry, 0)
 	mt.data.AscendRange(buildIndexKey(fromTs), buildIndexKey(toTs + 1), func (i btree.Item) bool {

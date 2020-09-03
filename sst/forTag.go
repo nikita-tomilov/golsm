@@ -245,6 +245,10 @@ func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	return ans[:it]
 }
 
+func (st *SSTforTag) Availability() (uint64, uint64) {
+	return st.currentMinimumTimestamp, st.currentMaximumTimestamp
+}
+
 func writeEntryToFile(e Entry, w *bufio.Writer) int64 {
 	bytes := e.ToByteArrayWithLength()
 	n, err := w.Write(bytes)

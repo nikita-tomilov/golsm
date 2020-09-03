@@ -53,6 +53,26 @@ func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 	wg.Wait()
 }
 
+func (sm *Manager) Availability() (uint64, uint64) {
+	fromts := ^uint64(0)
+	tots := uint64(0)
+
+	for _, sstft := range sm.sstForTag {
+		f, t := sstft.Availability()
+		if fromts > f {
+			fromts = f
+		}
+		if tots < t {
+			tots = t
+		}
+	}
+
+	if tots == uint64(0) {
+		return 0, 0
+	}
+	return fromts, tots
+}
+
 func (sm *Manager) ManagerForTag(tag string) *SSTforTag {
 	return sm.sstForTag[tag]
 }
