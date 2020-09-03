@@ -27,8 +27,8 @@ func TestSSTManager_SanityCheck(t *testing.T) {
 	st1e := st1.GetAllEntries()
 	st2e := st2.GetAllEntries()
 
-	assert.Equal(t, 3, len(st1e), "data count in sst mismatch for tagZero")
-	assert.Equal(t, 2, len(st2e), "data count in sst mismatch for tagOne")
+	assert.Equal(t, 3, len(st1e), "dto count in sst mismatch for tagZero")
+	assert.Equal(t, 2, len(st2e), "dto count in sst mismatch for tagOne")
 
 	//given
 	m = Manager{RootDir: m.RootDir}
@@ -47,8 +47,8 @@ func TestSSTManager_SanityCheck(t *testing.T) {
 	st1e = st1.GetAllEntries()
 	st2e = st2.GetAllEntries()
 
-	assert.Equal(t, 4, len(st1e), "data count in sst mismatch for tagZero after reopening")
-	assert.Equal(t, 3, len(st2e), "data count in sst mismatch for tagOne after reopening")
+	assert.Equal(t, 4, len(st1e), "dto count in sst mismatch for tagZero after reopening")
+	assert.Equal(t, 3, len(st2e), "dto count in sst mismatch for tagOne after reopening")
 
 	log.Close()
 }

@@ -17,32 +17,32 @@ func TestMemTManager_SanityCheck(t *testing.T) {
 	m.MergeWithCommitlog(actualEntries)
 
 	//then
-	assert.Equal(t, 2, len(m.sstForTag), "mt count mismatch")
+	assert.Equal(t, 2, len(m.memtForTag), "mt count mismatch")
 
-	st1 := m.sstForTag["tagZero"]
-	st2 := m.sstForTag["tagOne"]
+	st1 := m.memtForTag["tagZero"]
+	st2 := m.memtForTag["tagOne"]
 
 	st1e := st1.RetrieveAll()
 	st2e := st2.RetrieveAll()
 
-	assert.Equal(t, 3, len(st1e), "data count in mt mismatch for tagZero")
-	assert.Equal(t, 2, len(st2e), "data count in mt mismatch for tagOne")
+	assert.Equal(t, 3, len(st1e), "dto count in mt mismatch for tagZero")
+	assert.Equal(t, 2, len(st2e), "dto count in mt mismatch for tagOne")
 
 	//when
 	actualEntries2 := getDummyCommitlogEntriesForMultipleTags2()
 	m.MergeWithCommitlog(actualEntries2)
 
 	//then
-	assert.Equal(t, 2, len(m.sstForTag), "mt count mismatch")
+	assert.Equal(t, 2, len(m.memtForTag), "mt count mismatch")
 
-	st1 = m.sstForTag["tagZero"]
-	st2 = m.sstForTag["tagOne"]
+	st1 = m.memtForTag["tagZero"]
+	st2 = m.memtForTag["tagOne"]
 
 	st1e = st1.RetrieveAll()
 	st2e = st2.RetrieveAll()
 
-	assert.Equal(t, 4, len(st1e), "data count in mt mismatch for tagZero after appending")
-	assert.Equal(t, 3, len(st2e), "data count in mt mismatch for tagOne after appending")
+	assert.Equal(t, 4, len(st1e), "dto count in mt mismatch for tagZero after appending")
+	assert.Equal(t, 3, len(st2e), "dto count in mt mismatch for tagOne after appending")
 
 	log.Close()
 }
@@ -57,16 +57,16 @@ func TestMemTManager_MaxEntriesPerTagWorks(t *testing.T) {
 	m.MergeWithCommitlog(actualEntries)
 
 	//then
-	assert.Equal(t, 2, len(m.sstForTag), "mt count mismatch")
+	assert.Equal(t, 2, len(m.memtForTag), "mt count mismatch")
 
-	st1 := m.sstForTag["tagZero"]
-	st2 := m.sstForTag["tagOne"]
+	st1 := m.memtForTag["tagZero"]
+	st2 := m.memtForTag["tagOne"]
 
 	st1e := st1.RetrieveAll()
 	st2e := st2.RetrieveAll()
 
-	assert.Equal(t, 2, len(st1e), "data count in mt mismatch for tagZero")
-	assert.Equal(t, 2, len(st2e), "data count in mt mismatch for tagOne")
+	assert.Equal(t, 2, len(st1e), "dto count in mt mismatch for tagZero")
+	assert.Equal(t, 2, len(st2e), "dto count in mt mismatch for tagOne")
 
 	assert.Equal(t, uint64(1341), st1e[0].Timestamp, "incorrect timestamp for tagZero")
 	assert.Equal(t, uint64(1345), st1e[1].Timestamp, "incorrect timestamp for tagZero")
@@ -78,16 +78,16 @@ func TestMemTManager_MaxEntriesPerTagWorks(t *testing.T) {
 	m.MergeWithCommitlog(actualEntries2)
 
 	//then
-	assert.Equal(t, 2, len(m.sstForTag), "mt count mismatch")
+	assert.Equal(t, 2, len(m.memtForTag), "mt count mismatch")
 
-	st1 = m.sstForTag["tagZero"]
-	st2 = m.sstForTag["tagOne"]
+	st1 = m.memtForTag["tagZero"]
+	st2 = m.memtForTag["tagOne"]
 
 	st1e = st1.RetrieveAll()
 	st2e = st2.RetrieveAll()
 
-	assert.Equal(t, 2, len(st1e), "data count in mt mismatch for tagZero after appending")
-	assert.Equal(t, 2, len(st2e), "data count in mt mismatch for tagOne after appending")
+	assert.Equal(t, 2, len(st1e), "dto count in mt mismatch for tagZero after appending")
+	assert.Equal(t, 2, len(st2e), "dto count in mt mismatch for tagOne after appending")
 
 	assert.Equal(t, uint64(1345), st1e[0].Timestamp, "incorrect timestamp for tagZero")
 	assert.Equal(t, uint64(1347), st1e[1].Timestamp, "incorrect timestamp for tagZero")

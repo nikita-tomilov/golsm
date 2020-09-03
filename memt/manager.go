@@ -9,13 +9,13 @@ import (
 )
 
 type Manager struct {
-	sstForTag        map[string]*MemTforTag
+	memtForTag       map[string]*MemTforTag
 	mutex            *sync.Mutex
 	MaxEntriesPerTag int
 }
 
 func (sm *Manager) InitStorage() {
-	sm.sstForTag = make(map[string]*MemTforTag)
+	sm.memtForTag = make(map[string]*MemTforTag)
 	if sm.MaxEntriesPerTag == 0 {
 		sm.MaxEntriesPerTag = 10
 	}
@@ -37,12 +37,7 @@ func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 			newGroup[0] = entry
 			groupedByTag[tag] = newGroup
 		}
-		_, sstForTagExists := sm.sstForTag[tag]
-		if !sstForTagExists {
-			sst := MemTforTag{Tag: tag, MaxEntriesCount: sm.MaxEntriesPerTag}
-			sst.InitStorage()
-			sm.sstForTag[tag] = &sst
-		}
+		sm.createMemtForTagIfNeeded(tag)
 	}
 
 	var wg sync.WaitGroup
@@ -55,13 +50,30 @@ func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 	wg.Wait()
 }
 
+func (sm *Manager) MergeWithCommitlogForTag(tag string, entries []commitlog.Entry) {
+	sm.createMemtForTagIfNeeded(tag)
+	st := sm.memtForTag[tag]
+	st.MergeWithCommitlog(entries)
+}
+
+func (sm *Manager) createMemtForTagIfNeeded(tag string) {
+	_, sstForTagExists := sm.memtForTag[tag]
+	if !sstForTagExists {
+		sm.createMemtForTag(tag)
+	}
+}
+
+func (sm *Manager) createMemtForTag(tag string) {
+	memtft := MemTforTag{Tag: tag, MaxEntriesCount: sm.MaxEntriesPerTag}
+	memtft.InitStorage()
+	sm.memtForTag[tag] = &memtft
+}
+
 func (sm *Manager) MemTableForTag(tag string) *MemTforTag {
-	return sm.sstForTag[tag]
+	return sm.memtForTag[tag]
 }
 
 func applyEntriesForTag(wg *sync.WaitGroup, sm *Manager, tag string, entries []commitlog.Entry) {
 	defer wg.Done()
-
-	st := sm.sstForTag[tag]
-	st.MergeWithCommitlog(entries)
+	sm.MergeWithCommitlogForTag(tag, entries)
 }
