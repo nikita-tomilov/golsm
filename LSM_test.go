@@ -17,10 +17,10 @@ func TestLSM_StorageWriterWorks(t *testing.T) {
 	//given
 	clm := commitlog.Manager{Path: fmt.Sprintf("/tmp/golsm_test/diskwriter/commitlog-%d-%d", utils.GetNowMillis(), utils.GetTestIdx())}
 	sstm := sst.Manager{RootDir: fmt.Sprintf("/tmp/golsm_test/diskwriter/sstm-%d-%d", utils.GetNowMillis(), utils.GetTestIdx())}
-	dw := writer.DiskWriter{SstManager: &sstm, ClManager:&clm, EntriesPerCommitlog: 10, PeriodBetweenFlushes: 5 * time.Second}
+	dw := writer.DiskWriter{SstManager: &sstm, ClManager: &clm, EntriesPerCommitlog: 10, PeriodBetweenFlushes: 5 * time.Second}
 	dw.Init()
 
-	memtm := memt.Manager{MaxEntriesPerTag:9999}
+	memtm := memt.Manager{MaxEntriesPerTag: 9999}
 	memtm.InitStorage()
 
 	storageWriter := StorageWriter{MemTable: &memtm, DiskWriter: &dw}
@@ -54,19 +54,12 @@ func TestLSM_StorageWriterWorks(t *testing.T) {
 }
 
 func TestLSM_StorageReaderWorks(t *testing.T) {
-	//given
-	clm := commitlog.Manager{Path: fmt.Sprintf("/tmp/golsm_test/diskwriter/commitlog-%d-%d", utils.GetNowMillis(), utils.GetTestIdx())}
-	sstm := sst.Manager{RootDir: fmt.Sprintf("/tmp/golsm_test/diskwriter/sstm-%d-%d", utils.GetNowMillis(), utils.GetTestIdx())}
-	dw := writer.DiskWriter{SstManager: &sstm, ClManager:&clm, EntriesPerCommitlog: 10, PeriodBetweenFlushes: 5 * time.Second}
-	dw.Init()
-
-	memtm := memt.Manager{MaxEntriesPerTag:9999}
-	memtm.InitStorage()
-
-	storageWriter := StorageWriter{MemTable: &memtm, DiskWriter: &dw}
-	storageWriter.Init()
-
-	storageReader := StorageReader{MemTable: &memtm, SSTManager: &sstm}
+	storageReader, storageWriter := InitStorage(
+		fmt.Sprintf("/tmp/golsm_test/diskwriter/commitlog-%d-%d", utils.GetNowMillis(), utils.GetTestIdx()),
+		10,
+		5*time.Second,
+		fmt.Sprintf("/tmp/golsm_test/diskwriter/sstm-%d-%d", utils.GetNowMillis(), utils.GetTestIdx()),
+		9999)
 
 	const tagName = "whatever"
 	const expiration = 0
