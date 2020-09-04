@@ -82,7 +82,7 @@ func (st *SSTforTag) iterateOverFileAndApplyForEntries(fileOffsetBytes int64, en
 	file, err := os.OpenFile(st.FileName, os.O_RDONLY, 0644)
 	utils.Check(err)
 
-	if fileOffsetBytes != 0 {
+	if fileOffsetBytes > 0 {
 		_, ok := file.Seek(fileOffsetBytes, 0)
 		utils.Check(ok)
 	}
@@ -219,6 +219,9 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 }
 
 func (st *SSTforTag) GetEntriesWithoutIndex(fromTs uint64, toTs uint64) []Entry {
+	if st.index.Len() == 0 {
+		return []Entry{}
+	}
 	ans := make([]Entry, 0)
 	st.iterateOverFileAndApplyForAllEntries(func(e Entry, o int64) {
 		if (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) {
@@ -231,9 +234,12 @@ func (st *SSTforTag) GetEntriesWithoutIndex(fromTs uint64, toTs uint64) []Entry 
 func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	count := 0
 	firstOffset := int64(-1)
+	if st.index.Len() == 0 {
+		return []Entry{}
+	}
 	st.index.AscendRange(buildIndexEntry(fromTs, 0), buildIndexEntry(toTs + 1, 0), func (i btree.Item) bool {
 		oe := i.(IndexEntry)
-		log.Debug(fmt.Sprintf("ascendRange on entry ts %d offset %d", oe.ts, oe.fileOffset))
+		log.Debug(fmt.Sprintf("ascendRange on tag %s entry ts %d offset %d", st.Tag, oe.ts, oe.fileOffset))
 		if firstOffset == -1 {
 			firstOffset = oe.fileOffset
 		}
@@ -243,12 +249,12 @@ func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	})
 	ans := make([]Entry, 0)
 	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(entry Entry, i int64) {
-		if entry.Timestamp > 0 {
+		if (entry.Timestamp > 0) && (entry.Timestamp >= fromTs) && (entry.Timestamp <= toTs) {
 			ans = append(ans, entry)
 		}
 	})
 	if len(ans) != count {
-		panic(fmt.Sprintf("MISMATCH IN LENGTH: INDEX SAID %d, IN REALITY WAS %d", count, len(ans)))
+		panic(fmt.Sprintf("MISMATCH IN LENGTH ON TAG %s: INDEX SAID %d, IN REALITY WAS %d", st.Tag, count, len(ans)))
 	}
 	return ans
 }
