@@ -60,21 +60,35 @@ func maxNotZero(a uint64, b uint64) uint64 {
 	return b
 }
 
-//TODO: OPTIMIZE REGARDING AVAILABILITY (E.G. IF THE REQUESTED RANGE IS FULLY WITHIN MEMT, NO NEED TO USE SST)
 func retrieveDataForTag(wg *sync.WaitGroup, sr *StorageReader, tag string, from uint64, to uint64, res *map[string][]dto.Measurement) {
 	defer wg.Done()
 
-	sstForTag := sr.SSTManager.ManagerForTag(tag)
-	dataFromSst := sstForTag.GetEntriesWithIndex(from, to)
-
 	memtForTag := sr.MemTable.MemTableForTag(tag)
-	dataFromMemt := memtForTag.Retrieve(from, to)
+	sstForTag := sr.SSTManager.ManagerForTag(tag)
 
 	timestampToValue := make(map[uint64][]byte)
+	var dataFromMemt []memt.Entry
 
-	for _, dfs := range dataFromSst {
-		timestampToValue[dfs.Timestamp] = dfs.Value
+	if memtForTag == nil {
+		return
 	}
+
+	availMemtFrom, availMemtTo := memtForTag.Availability()
+
+	if (availMemtFrom != 0) && (availMemtTo != 0) {
+		dataFromMemt = memtForTag.Retrieve(from, to)
+	}
+
+	if (availMemtFrom >= from) || (availMemtTo <= to) {
+		if sstForTag != nil {
+			dataFromSst := sstForTag.GetEntriesWithIndex(from, to)
+
+			for _, dfs := range dataFromSst {
+				timestampToValue[dfs.Timestamp] = dfs.Value
+			}
+		}
+	}
+
 	for _, dfm := range dataFromMemt {
 		timestampToValue[dfm.Timestamp] = dfm.Value
 	}
