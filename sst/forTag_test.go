@@ -17,7 +17,7 @@ func TestSSTforTag_SanityCheck(t *testing.T) {
 	//when
 	actualEntries := getDummyCommitlogEntries()
 	st.MergeWithCommitlog(actualEntries)
-	min, max := st.GetFileRange()
+	min, max := st.Availability()
 
 	//then
 	retrievedEntries := st.GetAllEntries()
@@ -36,7 +36,7 @@ func TestSSTforTag_SanityCheck(t *testing.T) {
 	st.InitStorage()
 
 	//when
-	min, max = st.GetFileRange()
+	min, max = st.Availability()
 
 	//then
 	assert.Equal(t, uint64(1337), min, "min ts incorrect after file reopening")
@@ -45,7 +45,7 @@ func TestSSTforTag_SanityCheck(t *testing.T) {
 	//when
 	actualEntries2 := getDummyCommitlogEntries2()
 	st.MergeWithCommitlog(actualEntries2)
-	min2, max2 := st.GetFileRange()
+	min2, max2 := st.Availability()
 
 	//then
 	retrievedEntries2 := st.GetAllEntries()
@@ -70,7 +70,7 @@ func TestSSTforTag_IndexWorks(t *testing.T) {
 	//when
 	actualEntries := getBigBatchOfEntries(1000, 1000, 0)
 	st.MergeWithCommitlog(actualEntries)
-	min, max := st.GetFileRange()
+	min, max := st.Availability()
 
 	//then
 	assert.Equal(t, uint64(10000), min, "min ts incorrect")

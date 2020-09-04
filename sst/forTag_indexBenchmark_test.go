@@ -12,7 +12,7 @@ import (
 func BenchmarkGetEntriesWithIndex(b *testing.B) {
 	stSsd := getNewInitializedStorage("/home/hotaro/sst-file-ssd.db")
 	stHdd := getNewInitializedStorage("/media/hotaro/Bigdata/sst-file-hdd.db")
-	min, max := stSsd.GetFileRange()
+	min, max := stSsd.Availability()
 
 	functions := []struct {
 		name string
@@ -54,7 +54,7 @@ func getNewInitializedStorage(path string) *SSTforTag {
 	elapsed := time.Since(start)
 	log.Warn(fmt.Sprintf("Took %s to write %d entries to file %s", elapsed.String(), len(actualEntries), path))
 
-	min, max := st.GetFileRange()
+	min, max := st.Availability()
 
 	//then
 	if min != uint64(10000) {

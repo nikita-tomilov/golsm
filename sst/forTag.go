@@ -8,6 +8,7 @@ import (
 	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/commitlog"
 	"github.com/nikita-tomilov/golsm/utils"
+	utils2 "github.com/nikita-tomilov/gotsdb/utils"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,8 +19,6 @@ import (
 type SSTforTag struct {
 	Tag                     string
 	FileName                string
-	currentMinimumTimestamp uint64
-	currentMaximumTimestamp uint64
 	file                    *os.File
 	mutex                   *sync.Mutex
 	index                   *btree.BTree
@@ -41,8 +40,6 @@ func (st *SSTforTag) initOverNewFile() {
 	utils.Check(err)
 	st.file = file
 	st.mutex = &sync.Mutex{}
-	st.currentMinimumTimestamp = 0
-	st.currentMaximumTimestamp = 0
 }
 
 func (st *SSTforTag) initOverExistingFile() {
@@ -60,11 +57,8 @@ func (st *SSTforTag) reopenFile() {
 }
 
 func (st *SSTforTag) rebuildIndex() {
-	st.currentMinimumTimestamp = ^uint64(0)
-	st.currentMaximumTimestamp = 0
 	st.iterateOverFileAndApplyForAllEntries(func(e Entry, o int64) {
-		tryOverrideRange(e, &(st.currentMinimumTimestamp), &(st.currentMaximumTimestamp))
-		st.index.ReplaceOrInsert(buildIndexKey(e.Timestamp, o))
+		st.index.ReplaceOrInsert(buildIndexEntry(e.Timestamp, o))
 	})
 }
 
@@ -125,24 +119,42 @@ func (st *SSTforTag) iterateOverFileAndApplyForEntries(fileOffsetBytes int64, en
 	st.mutex.Unlock()
 }
 
-func (st *SSTforTag) GetFileRange() (uint64, uint64) {
-	return st.currentMinimumTimestamp, st.currentMaximumTimestamp
+func (st *SSTforTag) getCurrentMinTimestamp() uint64 {
+	min := st.index.Min()
+	if min == nil {
+		return 0
+	}
+	mine := min.(IndexEntry)
+	return mine.ts
+}
+
+func (st *SSTforTag) getCurrentMaxTimestamp() uint64 {
+	max := st.index.Max()
+	if max == nil {
+		return 0
+	}
+	maxe := max.(IndexEntry)
+	return maxe.ts
 }
 
 func (st *SSTforTag) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 	//TODO: maybe I should filter by tag directly here to avoid additional O(N)
-	minimalTimestamp := commitlogEntries[0].Timestamp
-	if st.currentMinimumTimestamp != 0 {
-		if minimalTimestamp >= st.currentMaximumTimestamp {
-			st.appendDataToEndOfTable(commitlogEntries)
-			st.currentMaximumTimestamp = commitlogEntries[len(commitlogEntries)-1].Timestamp
+	sorted := commitlogEntries
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Timestamp < sorted[j].Timestamp
+	})
+	minimalTimestamp := sorted[0].Timestamp
+	for _, e := range sorted {
+		minimalTimestamp = utils2.Min(minimalTimestamp, e.Timestamp)
+	}
+	if st.getCurrentMinTimestamp() != 0 {
+		if minimalTimestamp >= st.getCurrentMaxTimestamp() {
+			st.appendDataToEndOfTable(sorted)
 		} else {
-			st.addDataResortingTable(commitlogEntries)
+			st.addDataResortingTable(sorted)
 		}
 	} else {
-		st.appendDataToEndOfTable(commitlogEntries)
-		st.currentMaximumTimestamp = commitlogEntries[len(commitlogEntries)-1].Timestamp
-		st.currentMinimumTimestamp = commitlogEntries[0].Timestamp
+		st.appendDataToEndOfTable(sorted)
 	}
 }
 
@@ -154,7 +166,7 @@ func (st *SSTforTag) appendDataToEndOfTable(commitlogEntries []commitlog.Entry) 
 	writer := bufio.NewWriter(st.file)
 	for _, entry := range commitlogEntries {
 		sstEntry := Entry{Timestamp: entry.Timestamp, ExpiresAt: entry.ExpiresAt, Value: entry.Value}
-		st.index.ReplaceOrInsert(buildIndexKey(sstEntry.Timestamp, offset))
+		st.index.ReplaceOrInsert(buildIndexEntry(sstEntry.Timestamp, offset))
 		offset += writeEntryToFile(sstEntry, writer)
 	}
 	err = writer.Flush()
@@ -172,9 +184,6 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 	writer := bufio.NewWriter(copyFile)
 	idx := 0
 
-	minTs := commitlogEntries[0].Timestamp
-	maxTs := commitlogEntries[0].Timestamp
-
 	//over sstable
 	st.iterateOverFileAndApplyForAllEntries(func(sstEntry Entry, o int64) {
 		if idx < len(commitlogEntries) {
@@ -182,12 +191,10 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 			if commitlogEntry.Timestamp < sstEntry.Timestamp {
 				newSstEntry := Entry{Timestamp: commitlogEntry.Timestamp, ExpiresAt: commitlogEntry.ExpiresAt, Value: commitlogEntry.Value}
 				writeEntryToFile(newSstEntry, writer)
-				tryOverrideRange(newSstEntry, &minTs, &maxTs)
 				idx++
 			}
 		}
 		writeEntryToFile(sstEntry, writer)
-		tryOverrideRange(sstEntry, &minTs, &maxTs)
 	})
 
 	//over still unprocessed new commitlog entries, if there are any
@@ -195,7 +202,6 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 		newEntry := commitlogEntries[idx]
 		sstEntry := Entry{Timestamp: newEntry.Timestamp, ExpiresAt: newEntry.ExpiresAt, Value: newEntry.Value}
 		writeEntryToFile(sstEntry, writer)
-		tryOverrideRange(sstEntry, &minTs, &maxTs)
 		idx += 1
 	}
 
@@ -224,29 +230,31 @@ func (st *SSTforTag) GetEntriesWithoutIndex(fromTs uint64, toTs uint64) []Entry 
 
 func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	count := 0
-	firstOffset := int64(0)
-	st.index.AscendRange(buildIndexKey(fromTs, 0), buildIndexKey(toTs + 1, 0), func (i btree.Item) bool {
-		oe := i.(EntryIndexKey)
-		if firstOffset == 0 {
+	firstOffset := int64(-1)
+	st.index.AscendRange(buildIndexEntry(fromTs, 0), buildIndexEntry(toTs + 1, 0), func (i btree.Item) bool {
+		oe := i.(IndexEntry)
+		log.Debug(fmt.Sprintf("ascendRange on entry ts %d offset %d", oe.ts, oe.fileOffset))
+		if firstOffset == -1 {
 			firstOffset = oe.fileOffset
 		}
 		//log.Debug(fmt.Sprintf("launched for entry with ts %d", oe.ts))
 		count += 1
 		return true
 	})
-	ans := make([]Entry, count)
-	it := 0
+	ans := make([]Entry, 0)
 	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(entry Entry, i int64) {
 		if entry.Timestamp > 0 {
-			ans[it] = entry
-			it++
+			ans = append(ans, entry)
 		}
 	})
-	return ans[:it]
+	if len(ans) != count {
+		panic(fmt.Sprintf("MISMATCH IN LENGTH: INDEX SAID %d, IN REALITY WAS %d", count, len(ans)))
+	}
+	return ans
 }
 
 func (st *SSTforTag) Availability() (uint64, uint64) {
-	return st.currentMinimumTimestamp, st.currentMaximumTimestamp
+	return st.getCurrentMinTimestamp(), st.getCurrentMaxTimestamp()
 }
 
 func writeEntryToFile(e Entry, w *bufio.Writer) int64 {
@@ -260,25 +268,16 @@ func writeEntryToFile(e Entry, w *bufio.Writer) int64 {
 	//log.Debug(fmt.Sprintf("Wrote disk entry for ts %d of bytes count %d", e.Timestamp, len(bytes)))
 }
 
-func tryOverrideRange(e Entry, minTs *uint64, maxTs *uint64) {
-	if e.Timestamp < *minTs {
-		*minTs = e.Timestamp
-	}
-	if e.Timestamp > *maxTs {
-		*maxTs = e.Timestamp
-	}
-}
-
-type EntryIndexKey struct {
+type IndexEntry struct {
 	ts         uint64
 	fileOffset int64
 }
 
-func (e EntryIndexKey) Less(than btree.Item) bool {
-	oe := than.(EntryIndexKey)
+func (e IndexEntry) Less(than btree.Item) bool {
+	oe := than.(IndexEntry)
 	return e.ts < oe.ts
 }
 
-func buildIndexKey(ts uint64, offset int64) btree.Item {
-	return EntryIndexKey{ts, offset}
+func buildIndexEntry(ts uint64, offset int64) btree.Item {
+	return IndexEntry{ts, offset}
 }
