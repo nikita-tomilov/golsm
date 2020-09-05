@@ -3,6 +3,7 @@ package memt
 import (
 	"github.com/google/btree"
 	"github.com/nikita-tomilov/golsm/commitlog"
+	"github.com/nikita-tomilov/golsm/utils"
 	"sync"
 )
 
@@ -54,13 +55,32 @@ func (mt *MemTforTag) Availability() (uint64, uint64) {
 }
 
 func (mt *MemTforTag) Retrieve(fromTs uint64, toTs uint64) []Entry {
+	mt.mutex.Lock()
 	ans := make([]Entry, 0)
 	mt.data.AscendRange(buildIndexKey(fromTs), buildIndexKey(toTs + 1), func (i btree.Item) bool {
 		oe := i.(*Entry)
 		ans = append(ans, *oe)
 		return true
 	})
+	mt.mutex.Unlock()
 	return ans
+}
+
+func (mt *MemTforTag) PerformExpiration() {
+	mt.mutex.Lock()
+	toBeDeleted := make([]*Entry, 0)
+	now := utils.GetNowMillis()
+	mt.data.Ascend(func(i btree.Item) bool {
+		oe := i.(*Entry)
+		if (oe.ExpiresAt != 0) && (oe.ExpiresAt < now) {
+			toBeDeleted = append(toBeDeleted, oe)
+		}
+		return true
+	})
+	for _, i := range toBeDeleted {
+		mt.data.Delete(i)
+	}
+	mt.mutex.Unlock()
 }
 
 func buildIndexKey(ts uint64) btree.Item {

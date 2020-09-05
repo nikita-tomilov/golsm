@@ -6,12 +6,15 @@ import (
 	"github.com/nikita-tomilov/golsm/commitlog"
 	"sort"
 	"sync"
+	"time"
 )
 
 type Manager struct {
-	memtForTag       map[string]*MemTforTag
-	mutex            *sync.Mutex
-	MaxEntriesPerTag int
+	memtForTag             map[string]*MemTforTag
+	mutex                  *sync.Mutex
+	shouldBeRunning        bool
+	MaxEntriesPerTag       int
+	PerformExpirationEvery time.Duration
 }
 
 func (sm *Manager) InitStorage() {
@@ -19,6 +22,22 @@ func (sm *Manager) InitStorage() {
 	if sm.MaxEntriesPerTag == 0 {
 		sm.MaxEntriesPerTag = 10
 	}
+	if sm.PerformExpirationEvery == 0 {
+		sm.PerformExpirationEvery = 10 * time.Second
+	}
+	sm.shouldBeRunning = true
+	go func() {
+		for sm.shouldBeRunning {
+			time.Sleep(sm.PerformExpirationEvery)
+			for _, memtft := range sm.memtForTag {
+				memtft.PerformExpiration()
+			}
+		}
+	}()
+}
+
+func (sm *Manager) CloseStorage() {
+	sm.shouldBeRunning = false
 }
 
 func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
