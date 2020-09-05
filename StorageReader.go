@@ -104,5 +104,7 @@ func retrieveDataForTag(wg *sync.WaitGroup, sr *StorageReader, tag string, from 
 		return ans[i].Timestamp < ans[j].Timestamp
 	})
 
+	sr.mutex.Lock()
 	(*res)[tag] = ans
+	sr.mutex.Unlock()
 }

@@ -304,7 +304,7 @@ func (st *SSTforTag) Availability() (uint64, uint64) {
 }
 
 func writeEntryToFile(e Entry, w *bufio.Writer) int64 {
-	if e.ExpiresAt > utils.GetNowMillis() {
+	if e.ExpiresAt < utils.GetNowMillis() {
 		log.Debug("Attempt to WriteEntryToFile that was expired")
 		return 0
 	}
