@@ -48,6 +48,10 @@ func (mt *MemTforTag) Availability() (uint64, uint64) {
 	min := mt.data.Min()
 	max := mt.data.Max()
 
+	if (min == nil) || (max == nil) {
+		return 0, 0
+	}
+
 	mine := min.(*Entry)
 	maxe := max.(*Entry)
 

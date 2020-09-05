@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-func InitStorage(commitlogPath string, entriesPerCommitlog int, periodBetweenFlushes time.Duration, sstPath string, memtMaxEntriesPerTag int) (*StorageReader, *StorageWriter) {
+func InitStorage(commitlogPath string, entriesPerCommitlog int, periodBetweenFlushes time.Duration, memtExpirationPeriod time.Duration, sstPath string, memtMaxEntriesPerTag int) (*StorageReader, *StorageWriter) {
 	clm := commitlog.Manager{Path: commitlogPath}
 	sstm := sst.Manager{RootDir: sstPath}
 	dw := writer.DiskWriter{SstManager: &sstm, ClManager: &clm, EntriesPerCommitlog: entriesPerCommitlog, PeriodBetweenFlushes: periodBetweenFlushes}
 	dw.Init()
 
-	memtm := memt.Manager{MaxEntriesPerTag: memtMaxEntriesPerTag}
+	memtm := memt.Manager{MaxEntriesPerTag: memtMaxEntriesPerTag, PerformExpirationEvery: memtExpirationPeriod}
 	memtm.InitStorage()
 
 	storageWriter := StorageWriter{MemTable: &memtm, DiskWriter: &dw}

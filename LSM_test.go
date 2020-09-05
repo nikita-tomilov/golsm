@@ -58,6 +58,7 @@ func TestLSM_StorageReaderWorks(t *testing.T) {
 		fmt.Sprintf("/tmp/golsm_test/diskwriter/commitlog-%d-%d", utils.GetNowMillis(), utils.GetTestIdx()),
 		10,
 		5*time.Second,
+		10*time.Second,
 		fmt.Sprintf("/tmp/golsm_test/diskwriter/sstm-%d-%d", utils.GetNowMillis(), utils.GetTestIdx()),
 		9999)
 
