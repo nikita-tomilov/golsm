@@ -14,20 +14,26 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 )
 
 type SSTforTag struct {
 	Tag                     string
 	FileName                string
+	PerformCompactionEvery  time.Duration
 	file                    *os.File
 	mutex                   *sync.Mutex
 	index                   *btree.BTree
+	nextCompactionTimestamp uint64
 }
 
 func (st *SSTforTag) InitStorage() {
 	dir, _ := filepath.Split(st.FileName)
 	os.MkdirAll(dir, os.ModePerm)
 	st.index = btree.New(10)
+	if st.PerformCompactionEvery == 0 {
+		st.PerformCompactionEvery = time.Minute * 10
+	}
 	if utils.FileExists(st.FileName) {
 		st.initOverExistingFile()
 	} else {
@@ -58,7 +64,7 @@ func (st *SSTforTag) reopenFile() {
 
 func (st *SSTforTag) rebuildIndex() {
 	st.iterateOverFileAndApplyForAllEntries(func(e Entry, o int64) {
-		st.index.ReplaceOrInsert(buildIndexEntry(e.Timestamp, o))
+		st.index.ReplaceOrInsert(buildIndexEntry(e.Timestamp, o, e.ExpiresAt))
 	})
 }
 
@@ -74,7 +80,7 @@ func (st *SSTforTag) GetAllEntries() []Entry {
 }
 
 func (st *SSTforTag) iterateOverFileAndApplyForAllEntries(receiver func(Entry, int64)) {
-	st.iterateOverFileAndApplyForEntries(0, int((^uint(0)) >> 1) , receiver)
+	st.iterateOverFileAndApplyForEntries(0, int((^uint(0))>>1), receiver)
 }
 
 func (st *SSTforTag) iterateOverFileAndApplyForEntries(fileOffsetBytes int64, entriesCount int, receiver func(Entry, int64)) {
@@ -88,7 +94,8 @@ func (st *SSTforTag) iterateOverFileAndApplyForEntries(fileOffsetBytes int64, en
 	}
 	reader := bufio.NewReader(file)
 
-	readerFileOffset := int64(0)
+	readerFileOffset := int64(fileOffsetBytes)
+	prevFileOffset := int64(fileOffsetBytes)
 	entriesParsed := 0
 	sizeBuf := make([]uint8, 2)
 	for {
@@ -107,7 +114,8 @@ func (st *SSTforTag) iterateOverFileAndApplyForEntries(fileOffsetBytes int64, en
 		}
 		readerFileOffset += int64(n2)
 		entry := FromByteArray(entryBytes)
-		receiver(entry, readerFileOffset)
+		receiver(entry, prevFileOffset)
+		prevFileOffset = readerFileOffset
 		entriesParsed += 1
 		if entriesParsed >= entriesCount {
 			break
@@ -125,7 +133,12 @@ func (st *SSTforTag) getCurrentMinTimestamp() uint64 {
 		return 0
 	}
 	mine := min.(IndexEntry)
-	return mine.ts
+	if (mine.expiresAt != 0) && (mine.expiresAt < utils.GetNowMillis()) {
+		st.performExpirationWithinIndex()
+		return st.getCurrentMinTimestamp()
+	} else {
+		return mine.ts
+	}
 }
 
 func (st *SSTforTag) getCurrentMaxTimestamp() uint64 {
@@ -134,7 +147,27 @@ func (st *SSTforTag) getCurrentMaxTimestamp() uint64 {
 		return 0
 	}
 	maxe := max.(IndexEntry)
-	return maxe.ts
+	if (maxe.expiresAt != 0) && (maxe.expiresAt < utils.GetNowMillis()) {
+		st.performExpirationWithinIndex()
+		return st.getCurrentMaxTimestamp()
+	} else {
+		return maxe.ts
+	}
+}
+
+func (st *SSTforTag) performExpirationWithinIndex() {
+	toBeDeleted := make([]IndexEntry, 0)
+	now := utils.GetNowMillis()
+	st.index.Ascend(func(i btree.Item) bool {
+		oe := i.(IndexEntry)
+		if (oe.expiresAt != 0) && (oe.expiresAt < now) {
+			toBeDeleted = append(toBeDeleted, oe)
+		}
+		return true
+	})
+	for _, i := range toBeDeleted {
+		st.index.Delete(i)
+	}
 }
 
 func (st *SSTforTag) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
@@ -148,7 +181,7 @@ func (st *SSTforTag) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 		minimalTimestamp = utils2.Min(minimalTimestamp, e.Timestamp)
 	}
 	if st.getCurrentMinTimestamp() != 0 {
-		if minimalTimestamp >= st.getCurrentMaxTimestamp() {
+		if (minimalTimestamp >= st.getCurrentMaxTimestamp()) && (st.nextCompactionTimestamp > utils.GetNowMillis()) {
 			st.appendDataToEndOfTable(sorted)
 		} else {
 			st.addDataResortingTable(sorted)
@@ -166,7 +199,7 @@ func (st *SSTforTag) appendDataToEndOfTable(commitlogEntries []commitlog.Entry) 
 	writer := bufio.NewWriter(st.file)
 	for _, entry := range commitlogEntries {
 		sstEntry := Entry{Timestamp: entry.Timestamp, ExpiresAt: entry.ExpiresAt, Value: entry.Value}
-		st.index.ReplaceOrInsert(buildIndexEntry(sstEntry.Timestamp, offset))
+		st.index.ReplaceOrInsert(buildIndexEntry(sstEntry.Timestamp, offset, sstEntry.ExpiresAt))
 		offset += writeEntryToFile(sstEntry, writer)
 	}
 	err = writer.Flush()
@@ -198,7 +231,7 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 	})
 
 	//over still unprocessed new commitlog entries, if there are any
-	if idx < len(commitlogEntries) {
+	for idx < len(commitlogEntries) {
 		newEntry := commitlogEntries[idx]
 		sstEntry := Entry{Timestamp: newEntry.Timestamp, ExpiresAt: newEntry.ExpiresAt, Value: newEntry.Value}
 		writeEntryToFile(sstEntry, writer)
@@ -216,6 +249,7 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 	st.mutex.Unlock()
 	st.reopenFile()
 	st.rebuildIndex()
+	st.nextCompactionTimestamp = utils.GetNowMillis() + uint64(st.PerformCompactionEvery.Milliseconds())
 }
 
 func (st *SSTforTag) GetEntriesWithoutIndex(fromTs uint64, toTs uint64) []Entry {
@@ -223,8 +257,9 @@ func (st *SSTforTag) GetEntriesWithoutIndex(fromTs uint64, toTs uint64) []Entry 
 		return []Entry{}
 	}
 	ans := make([]Entry, 0)
+	now := utils.GetNowMillis()
 	st.iterateOverFileAndApplyForAllEntries(func(e Entry, o int64) {
-		if (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) {
+		if (e.Timestamp > 0) && (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) && ((e.ExpiresAt == 0) || (e.ExpiresAt >= now)) {
 			ans = append(ans, e)
 		}
 	})
@@ -234,24 +269,29 @@ func (st *SSTforTag) GetEntriesWithoutIndex(fromTs uint64, toTs uint64) []Entry 
 func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	count := 0
 	firstOffset := int64(-1)
+	now := utils.GetNowMillis()
 	if st.index.Len() == 0 {
 		return []Entry{}
 	}
-	st.index.AscendRange(buildIndexEntry(fromTs, 0), buildIndexEntry(toTs + 1, 0), func (i btree.Item) bool {
+	st.index.AscendRange(buildIndexEntry(fromTs, 0, 0), buildIndexEntry(toTs+1, 0, 0), func(i btree.Item) bool {
 		oe := i.(IndexEntry)
-		log.Debug(fmt.Sprintf("ascendRange on tag %s entry ts %d offset %d", st.Tag, oe.ts, oe.fileOffset))
+		if (oe.expiresAt != 0) && (oe.expiresAt < now) {
+			return true
+		}
+		//log.Debug(fmt.Sprintf("ascendRange on tag %s entry ts %d offset %d", st.Tag, oe.ts, oe.fileOffset))
 		if firstOffset == -1 {
 			firstOffset = oe.fileOffset
 		}
-		//log.Debug(fmt.Sprintf("launched for entry with ts %d", oe.ts))
 		count += 1
 		return true
 	})
 	ans := make([]Entry, 0)
-	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(entry Entry, i int64) {
-		if (entry.Timestamp > 0) && (entry.Timestamp >= fromTs) && (entry.Timestamp <= toTs) {
-			ans = append(ans, entry)
+	countInFile := 0
+	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(e Entry, i int64) {
+		if (e.Timestamp > 0) && (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) && ((e.ExpiresAt == 0) || (e.ExpiresAt >= now)){
+			ans = append(ans, e)
 		}
+		countInFile++
 	})
 	if len(ans) != count {
 		panic(fmt.Sprintf("MISMATCH IN LENGTH ON TAG %s: INDEX SAID %d, IN REALITY WAS %d", st.Tag, count, len(ans)))
@@ -264,6 +304,10 @@ func (st *SSTforTag) Availability() (uint64, uint64) {
 }
 
 func writeEntryToFile(e Entry, w *bufio.Writer) int64 {
+	if e.ExpiresAt > utils.GetNowMillis() {
+		log.Debug("Attempt to WriteEntryToFile that was expired")
+		return 0
+	}
 	bytes := e.ToByteArrayWithLength()
 	n, err := w.Write(bytes)
 	utils.Check(err)
@@ -277,6 +321,7 @@ func writeEntryToFile(e Entry, w *bufio.Writer) int64 {
 type IndexEntry struct {
 	ts         uint64
 	fileOffset int64
+	expiresAt  uint64
 }
 
 func (e IndexEntry) Less(than btree.Item) bool {
@@ -284,6 +329,6 @@ func (e IndexEntry) Less(than btree.Item) bool {
 	return e.ts < oe.ts
 }
 
-func buildIndexEntry(ts uint64, offset int64) btree.Item {
-	return IndexEntry{ts, offset}
+func buildIndexEntry(ts uint64, offset int64, expiresAt uint64) btree.Item {
+	return IndexEntry{ts, offset, expiresAt}
 }
