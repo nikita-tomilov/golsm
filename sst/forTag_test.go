@@ -6,7 +6,9 @@ import (
 	"github.com/nikita-tomilov/golsm/commitlog"
 	"github.com/nikita-tomilov/golsm/utils"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestSSTforTag_SanityCheck(t *testing.T) {
@@ -89,6 +91,44 @@ func TestSSTforTag_IndexWorks(t *testing.T) {
 	for i := range slice1 {
 		assert.Equal(t, slice1[i], slice2[i], "entry is not the same when with and without index")
 	}
+}
+
+func TestSSTforTag_ParallelReadsWritesWork(t *testing.T) {
+	//given
+	st := SSTforTag{FileName: fmt.Sprintf("/tmp/golsm_test/testForTag-%d-%d.db", utils.GetNowMillis(), utils.GetTestIdx())}
+	st.InitStorage()
+
+	//when
+	actualEntries := getBigBatchOfEntries(1000, 1000, 0)
+	st.MergeWithCommitlog(actualEntries)
+	min, max := st.Availability()
+
+	//then
+	assert.Equal(t, uint64(10000), min, "min ts incorrect")
+	assert.Equal(t, uint64(19990), max, "max ts incorrect")
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			newEntries := getBigBatchOfEntries(10, utils.GetNowMillis() / 10, 0)
+			st.MergeWithCommitlog(newEntries)
+			time.Sleep(2 * time.Second)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 20; i++ {
+			slice := st.GetEntriesWithoutIndex(15000, utils.GetNowMillis() / 10)
+			assert.Less(t, 0, len(slice), "entries count is incorrect with index")
+			time.Sleep(time.Second)
+		}
+	}()
+
+	wg.Wait()
 }
 
 func Teardown(t *testing.T) {

@@ -2,10 +2,8 @@ package commitlog
 
 import (
 	"encoding/binary"
-	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/utils"
 	"os"
-	"strconv"
 )
 
 type Commitlog interface {
@@ -29,13 +27,13 @@ func (o *OverFile) Init() {
 }
 
 func (o *OverFile) Store(entry Entry) {
-	log.Debug("STORE on " + o.commitlogFileName + " ts " + strconv.FormatUint(entry.Timestamp, 10))
+	//log.Debug("STORE on " + o.commitlogFileName + " ts " + strconv.FormatUint(entry.Timestamp, 10))
 	o.commitlogFile.Write(entry.ToByteArrayWithLength())
 	o.entriesCount += 1
 }
 
 func (o *OverFile) RetrieveAll() []Entry {
-	log.Debug("RETRIEVE ALL on " + o.commitlogFileName)
+	//log.Debug("RETRIEVE ALL on " + o.commitlogFileName)
 	return o.readAllEntries()
 }
 
@@ -67,7 +65,7 @@ func (o *OverFile) readAllEntries() []Entry {
 }
 
 func (o *OverFile) Clear() {
-	log.Debug("CLEAR on " + o.commitlogFileName)
+	//log.Debug("CLEAR on " + o.commitlogFileName)
 	o.commitlogFile.Close()
 	utils.Check(os.Remove(o.commitlogFileName))
 	o.Init()
