@@ -1,11 +1,8 @@
 package sst
 
 import (
-	"bytes"
 	"github.com/btcsuite/btcutil/base58"
-	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/commitlog"
-	"sort"
 	"sync"
 )
 
@@ -20,10 +17,6 @@ func (sm *Manager) InitStorage() {
 }
 
 func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
-	sort.Slice(commitlogEntries, func (i, j int) bool {
-		return bytes.Equal(commitlogEntries[i].Key, commitlogEntries[j].Key)
-	})
-
 	groupedByTag := make(map[string][]commitlog.Entry)
 	for _, entry := range commitlogEntries {
 		tag := string(entry.Key)
@@ -35,22 +28,11 @@ func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 			newGroup[0] = entry
 			groupedByTag[tag] = newGroup
 		}
-		_, sstForTagExists := sm.sstForTag[tag]
-		if !sstForTagExists {
-			sst := SSTforTag{Tag:tag, FileName:sm.RootDir + "/" + base58.Encode(entry.Key)}
-			sst.InitStorage()
-			sm.sstForTag[tag] = &sst
-		}
 	}
-
-	var wg sync.WaitGroup
-	for tag, entries := range groupedByTag {
-		log.Debug("Launching SST batch for tag %s", tag)
-		wg.Add(1)
-		go applyEntriesForTag(&wg, sm, tag, entries)
+	for tag, values := range groupedByTag {
+		sstForTag := sm.SstForTag(tag)
+		sstForTag.MergeWithCommitlog(values)
 	}
-
-	wg.Wait()
 }
 
 func (sm *Manager) Availability() (uint64, uint64) {
@@ -73,13 +55,17 @@ func (sm *Manager) Availability() (uint64, uint64) {
 	return fromts, tots
 }
 
-func (sm *Manager) ManagerForTag(tag string) *SSTforTag {
-	return sm.sstForTag[tag]
+func (sm *Manager) SstForTag(tag string) *SSTforTag {
+	sstForTag, sstForTagExists := sm.sstForTag[tag]
+	if !sstForTagExists {
+		sstForTag = sm.createSstForTag(tag)
+	}
+	return sstForTag
 }
 
-func applyEntriesForTag(wg *sync.WaitGroup, sm *Manager, tag string, entries []commitlog.Entry) {
-	defer wg.Done()
-
-	st := sm.sstForTag[tag]
-	st.MergeWithCommitlog(entries)
+func (sm *Manager) createSstForTag(tag string) *SSTforTag {
+	sst := SSTforTag{Tag:tag, FileName:sm.RootDir + "/" + base58.Encode([]byte(tag))}
+	sst.InitStorage()
+	sm.sstForTag[tag] = &sst
+	return &sst
 }

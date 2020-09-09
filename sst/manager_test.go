@@ -56,16 +56,16 @@ func TestSSTManager_SanityCheck(t *testing.T) {
 func getDummyCommitlogEntriesForMultipleTags() []commitlog.Entry {
 	ans := make([]commitlog.Entry, 5)
 	ans[0] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1337, ExpiresAt: 0, Value: make([]byte, 4)}
-	ans[1] = commitlog.Entry{Key: []byte("tagOne"), Timestamp: 1339, ExpiresAt: 3, Value: make([]byte, 2)}
-	ans[2] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1341, ExpiresAt: 6, Value: make([]byte, 16)}
-	ans[3] = commitlog.Entry{Key: []byte("tagOne"), Timestamp: 1343, ExpiresAt: 9, Value: make([]byte, 1)}
-	ans[4] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1345, ExpiresAt: 9, Value: make([]byte, 1)}
+	ans[1] = commitlog.Entry{Key: []byte("tagOne"), Timestamp: 1339, ExpiresAt: 0, Value: make([]byte, 2)}
+	ans[2] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1341, ExpiresAt: 0, Value: make([]byte, 16)}
+	ans[3] = commitlog.Entry{Key: []byte("tagOne"), Timestamp: 1343, ExpiresAt: 0, Value: make([]byte, 1)}
+	ans[4] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1345, ExpiresAt: 0, Value: make([]byte, 1)}
 	return ans
 }
 
 func getDummyCommitlogEntriesForMultipleTags2() []commitlog.Entry {
 	ans := make([]commitlog.Entry, 2)
 	ans[0] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: 1339, ExpiresAt: 0, Value: make([]byte, 4)}
-	ans[1] = commitlog.Entry{Key: []byte("tagOne"), Timestamp: 1341, ExpiresAt: 3, Value: make([]byte, 2)}
+	ans[1] = commitlog.Entry{Key: []byte("tagOne"), Timestamp: 1341, ExpiresAt: 0, Value: make([]byte, 2)}
 	return ans
 }

@@ -35,7 +35,7 @@ func TestDiskWriter_DataIsNotLost(t *testing.T) {
 		diskWriter.Store(dummyData[i])
 	}
 	time.Sleep(10 * time.Second)
-	writtenData := sstm.ManagerForTag("whatever").GetAllEntries()
+	writtenData := sstm.SstForTag("whatever").GetAllEntries()
 
 	//then
 	assert.Equal(t, len(dummyData), len(writtenData), "some dto was lost")

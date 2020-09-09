@@ -171,7 +171,6 @@ func (st *SSTforTag) performExpirationWithinIndex() {
 }
 
 func (st *SSTforTag) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
-	//TODO: maybe I should filter by tag directly here to avoid additional O(N)
 	sorted := commitlogEntries
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i].Timestamp < sorted[j].Timestamp
@@ -304,7 +303,7 @@ func (st *SSTforTag) Availability() (uint64, uint64) {
 }
 
 func writeEntryToFile(e Entry, w *bufio.Writer) int64 {
-	if e.ExpiresAt < utils.GetNowMillis() {
+	if (e.ExpiresAt != 0) && (e.ExpiresAt < utils.GetNowMillis()) {
 		log.Debug("Attempt to WriteEntryToFile that was expired")
 		return 0
 	}

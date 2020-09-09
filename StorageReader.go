@@ -1,7 +1,6 @@
 package golsm
 
 import (
-	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/dto"
 	"github.com/nikita-tomilov/golsm/memt"
 	"github.com/nikita-tomilov/golsm/sst"
@@ -22,14 +21,10 @@ func (sr *StorageReader) Init() {
 func (sr *StorageReader) Retrieve(tags []string, from uint64, to uint64) map[string][]dto.Measurement {
 	ans := make(map[string][]dto.Measurement)
 
-	var wg sync.WaitGroup
 	for _, tag := range tags {
-		log.Debug("Launching Retrieve batch for tag %s", tag)
-		wg.Add(1)
-		go retrieveDataForTag(&wg, sr, tag, from, to, &ans)
+		ans[tag] = sr.retrieveDataForTag(tag, from, to)
 	}
 
-	wg.Wait()
 	return ans
 }
 
@@ -60,17 +55,15 @@ func maxNotZero(a uint64, b uint64) uint64 {
 	return b
 }
 
-func retrieveDataForTag(wg *sync.WaitGroup, sr *StorageReader, tag string, from uint64, to uint64, res *map[string][]dto.Measurement) {
-	defer wg.Done()
-
+func (sr *StorageReader) retrieveDataForTag(tag string, from uint64, to uint64) []dto.Measurement {
 	memtForTag := sr.MemTable.MemTableForTag(tag)
-	sstForTag := sr.SSTManager.ManagerForTag(tag)
+	sstForTag := sr.SSTManager.SstForTag(tag)
 
 	timestampToValue := make(map[uint64][]byte)
 	var dataFromMemt []memt.Entry
 
 	if memtForTag == nil {
-		return
+		return nil
 	}
 
 	availMemtFrom, availMemtTo := memtForTag.Availability()
@@ -104,7 +97,5 @@ func retrieveDataForTag(wg *sync.WaitGroup, sr *StorageReader, tag string, from 
 		return ans[i].Timestamp < ans[j].Timestamp
 	})
 
-	sr.mutex.Lock()
-	(*res)[tag] = ans
-	sr.mutex.Unlock()
+	return ans
 }

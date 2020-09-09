@@ -38,7 +38,7 @@ func TestLSM_StorageWriterWorks(t *testing.T) {
 	storageWriter.Store(slice(dummyData, tagName, 20, 25), expiration)
 	time.Sleep(10 * time.Second)
 
-	storedDataOnDisk := sstm.ManagerForTag(tagName).GetAllEntries()
+	storedDataOnDisk := sstm.SstForTag(tagName).GetAllEntries()
 	storedDataInMemT := memtm.MemTableForTag(tagName).RetrieveAll()
 
 	//then
