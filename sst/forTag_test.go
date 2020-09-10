@@ -114,7 +114,7 @@ func TestSSTforTag_ParallelReadsWritesWork(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 10; i++ {
-			newEntries := getBigBatchOfEntries(10, utils.GetNowMillis() / 10, 0)
+			newEntries := getBigBatchOfEntries(10, utils.GetNowMillis()/10, 0)
 			st.MergeWithCommitlog(newEntries)
 			time.Sleep(2 * time.Second)
 		}
@@ -123,7 +123,7 @@ func TestSSTforTag_ParallelReadsWritesWork(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 20; i++ {
-			slice := st.GetEntriesWithoutIndex(15000, utils.GetNowMillis() / 10)
+			slice := st.GetEntriesWithoutIndex(15000, utils.GetNowMillis()/10)
 			assert.Less(t, 0, len(slice), "entries count is incorrect with index")
 			time.Sleep(time.Second)
 		}
@@ -134,7 +134,7 @@ func TestSSTforTag_ParallelReadsWritesWork(t *testing.T) {
 
 func TestSSTforTag_WritesSortedFile(t *testing.T) {
 	//given
-	path := "test_3yYHfn_2"
+	path := "/tmp/golsm_test/test_3yYHfn_2"
 	os.Remove(path)
 	st := SSTforTag{FileName: path}
 	st.InitStorage()
@@ -153,8 +153,7 @@ func TestSSTforTag_WritesSortedFile(t *testing.T) {
 	assert.Equal(t, 1500, len(entries), "size incorrect") //not 3000 because of repeating TSs
 }
 
-//TODO: UPDATE FILE FOR THE TEST
-/*func TestSSTforTag_ReadsExistingFile(t *testing.T) {
+func TestSSTforTag_ReadsExistingFile(t *testing.T) {
 	//given
 	st := SSTforTag{FileName: "test_3yYHfn"}
 	st.InitStorage()
@@ -163,8 +162,8 @@ func TestSSTforTag_WritesSortedFile(t *testing.T) {
 	min, max := st.Availability()
 
 	//then
-	assert.Equal(t, uint64(1599670303523), min, "min ts incorrect") //Wednesday, 9 September 2020 г., 16:51:43.523
-	assert.Equal(t, uint64(1599673902523), max, "max ts incorrect") //Wednesday, 9 September 2020 г., 17:51:42.523
+	assert.Equal(t, uint64(1599759420524), min, "min ts incorrect") //Thursday, 10 September 2020 г., 17:37:00.524
+	assert.Equal(t, uint64(1599763019524), max, "max ts incorrect") //Thursday, 10 September 2020 г., 18:36:59.524
 
 	//when
 	all := st.GetAllEntries()
@@ -177,18 +176,14 @@ func TestSSTforTag_WritesSortedFile(t *testing.T) {
 			from -= 10
 		}
 		dWithoutIndex := st.GetEntriesWithoutIndex(from, to)
-		if len(dWithoutIndex) == 0 {
-			panic("dWithoutIndex empty")
-		}
-		fmt.Printf("without index for %d - %d : %d points\n", from, to, len(dWithoutIndex))
+		//fmt.Printf("without index for %d - %d : %d points\n", from, to, len(dWithoutIndex))
 
 		dWithIndex := st.GetEntriesWithIndex(from, to)
-		if len(dWithIndex) == 0 {
-			panic("dWithIndex empty")
-		}
-		fmt.Printf("with index for %d - %d : %d points\n", from, to, len(dWithIndex))
+		//fmt.Printf("with index for %d - %d : %d points\n", from, to, len(dWithIndex))
+
+		assert.Equal(t, len(dWithoutIndex), len(dWithIndex), fmt.Sprintf("size incorrect for %d-%d: w/ %d, w/o %d", from, to, len(dWithIndex), len(dWithoutIndex)))
 	}
-}*/
+}
 
 func Teardown(t *testing.T) {
 	log.Close()
@@ -217,7 +212,7 @@ func getBigBatchOfEntriesOfSize(count int, firstTs uint64, delta uint64, size in
 	ans := make([]commitlog.Entry, count)
 	i := 0
 	for i < count {
-		ans[i] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: (firstTs + uint64(i)) * 10 + delta, ExpiresAt: 0, Value: make([]byte, size)}
+		ans[i] = commitlog.Entry{Key: []byte("tagZero"), Timestamp: (firstTs+uint64(i))*10 + delta, ExpiresAt: 0, Value: make([]byte, size)}
 		i++
 	}
 	return ans

@@ -305,8 +305,6 @@ func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(e Entry, i int64) {
 		if (e.Timestamp > 0) && (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) && ((e.ExpiresAt == 0) || (e.ExpiresAt >= now)) {
 			ans = append(ans, e)
-		} else {
-			print("mismatch")
 		}
 		countInFile++
 	})
