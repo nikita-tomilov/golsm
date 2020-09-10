@@ -31,7 +31,7 @@ func (mt *MemTforTag) MergeWithCommitlog(entries []commitlog.Entry) {
 
 func (mt *MemTforTag) save(timestamp uint64, expiresAt uint64, value []byte) {
 	entry := Entry{Timestamp: timestamp, ExpiresAt: expiresAt, Value: value}
-	if mt.data.Len() >= mt.MaxEntriesCount {
+	if (mt.MaxEntriesCount != 0) && (mt.data.Len() >= mt.MaxEntriesCount) {
 		min := mt.data.Min()
 		if min.Less(&entry) {
 			mt.data.DeleteMin()
