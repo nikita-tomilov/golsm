@@ -229,6 +229,8 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 		writeEntryToFile(sstEntry, writer)
 	})
 
+	st.mutex.Lock()
+
 	//over still unprocessed new commitlog entries, if there are any
 	for idx < len(commitlogEntries) {
 		newEntry := commitlogEntries[idx]
@@ -241,7 +243,6 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 	copyFile.Sync()
 	copyFile.Close()
 
-	st.mutex.Lock()
 	st.file.Close()
 	err = os.Rename(copyFileName, st.FileName)
 	utils.Check(err)
@@ -272,6 +273,7 @@ func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	if st.index.Len() == 0 {
 		return []Entry{}
 	}
+	st.mutex.Lock()
 	st.index.AscendRange(buildIndexEntry(fromTs, 0, 0), buildIndexEntry(toTs+1, 0, 0), func(i btree.Item) bool {
 		oe := i.(IndexEntry)
 		if (oe.expiresAt != 0) && (oe.expiresAt < now) {
@@ -284,6 +286,7 @@ func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 		count += 1
 		return true
 	})
+	st.mutex.Unlock()
 	ans := make([]Entry, 0)
 	countInFile := 0
 	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(e Entry, i int64) {

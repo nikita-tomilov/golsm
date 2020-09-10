@@ -131,6 +131,42 @@ func TestSSTforTag_ParallelReadsWritesWork(t *testing.T) {
 	wg.Wait()
 }
 
+func TestSSTforTag_ReadsExistingFile(t *testing.T) {
+	//given
+	st := SSTforTag{FileName: "/home/hotaro/go/src/github.com/nikita-tomilov/golsm/test_3yYHfn"}
+	st.InitStorage()
+
+	//when
+	min, max := st.Availability()
+
+	//then
+	assert.Equal(t, uint64(1599670303523), min, "min ts incorrect") //Wednesday, 9 September 2020 г., 16:51:43.523
+	assert.Equal(t, uint64(1599673902523), max, "max ts incorrect") //Wednesday, 9 September 2020 г., 17:51:42.523
+
+	//when
+	all := st.GetAllEntries()
+	assert.Equal(t, 3600, len(all), "all entries count is incorrect")
+
+	for i := 0; i < 10000; i++ {
+		from := randomTs(min+20, min+(max-min)/2)
+		to := randomTs(from, max)
+		if to-from <= 10 {
+			from -= 10
+		}
+		dWithoutIndex := st.GetEntriesWithoutIndex(from, to)
+		if len(dWithoutIndex) == 0 {
+			panic("dWithoutIndex empty")
+		}
+		fmt.Printf("without index for %d - %d : %d points\n", from, to, len(dWithoutIndex))
+
+		dWithIndex := st.GetEntriesWithIndex(from, to)
+		if len(dWithIndex) == 0 {
+			panic("dWithIndex empty")
+		}
+		fmt.Printf("with index for %d - %d : %d points\n", from, to, len(dWithIndex))
+	}
+}
+
 func Teardown(t *testing.T) {
 	log.Close()
 }
