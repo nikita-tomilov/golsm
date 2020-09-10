@@ -6,6 +6,7 @@ import (
 	"github.com/nikita-tomilov/golsm/commitlog"
 	"github.com/nikita-tomilov/golsm/utils"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -131,9 +132,31 @@ func TestSSTforTag_ParallelReadsWritesWork(t *testing.T) {
 	wg.Wait()
 }
 
-func TestSSTforTag_ReadsExistingFile(t *testing.T) {
+func TestSSTforTag_WritesSortedFile(t *testing.T) {
 	//given
-	st := SSTforTag{FileName: "/home/hotaro/go/src/github.com/nikita-tomilov/golsm/test_3yYHfn"}
+	path := "test_3yYHfn_2"
+	os.Remove(path)
+	st := SSTforTag{FileName: path}
+	st.InitStorage()
+
+	//when
+	actualEntries1 := getBigBatchOfEntries(1000, 1000, 0)
+	st.MergeWithCommitlog(actualEntries1)
+	actualEntries2 := getBigBatchOfEntries(1000, 500, 0)
+	st.MergeWithCommitlog(actualEntries2)
+	actualEntries3 := getBigBatchOfEntries(1000, 750, 0)
+	st.MergeWithCommitlog(actualEntries3)
+
+	entries := st.GetAllEntries()
+
+	//then
+	assert.Equal(t, 1500, len(entries), "size incorrect") //not 3000 because of repeating TSs
+}
+
+//TODO: UPDATE FILE FOR THE TEST
+/*func TestSSTforTag_ReadsExistingFile(t *testing.T) {
+	//given
+	st := SSTforTag{FileName: "test_3yYHfn"}
 	st.InitStorage()
 
 	//when
@@ -165,7 +188,7 @@ func TestSSTforTag_ReadsExistingFile(t *testing.T) {
 		}
 		fmt.Printf("with index for %d - %d : %d points\n", from, to, len(dWithIndex))
 	}
-}
+}*/
 
 func Teardown(t *testing.T) {
 	log.Close()

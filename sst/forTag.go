@@ -8,7 +8,6 @@ import (
 	log "github.com/jeanphorn/log4go"
 	"github.com/nikita-tomilov/golsm/commitlog"
 	"github.com/nikita-tomilov/golsm/utils"
-	utils2 "github.com/nikita-tomilov/gotsdb/utils"
 	"io"
 	"os"
 	"path/filepath"
@@ -97,6 +96,7 @@ func (st *SSTforTag) iterateOverFileAndApplyForEntries(fileOffsetBytes int64, en
 	readerFileOffset := int64(fileOffsetBytes)
 	prevFileOffset := int64(fileOffsetBytes)
 	entriesParsed := 0
+	prevEntry := Entry{Timestamp: 0}
 	sizeBuf := make([]uint8, 2)
 	for {
 		n, err := io.ReadFull(reader, sizeBuf)
@@ -114,6 +114,10 @@ func (st *SSTforTag) iterateOverFileAndApplyForEntries(fileOffsetBytes int64, en
 		}
 		readerFileOffset += int64(n2)
 		entry := FromByteArray(entryBytes)
+		if entry.Timestamp < prevEntry.Timestamp {
+			panic(fmt.Sprintf("SST was not sorted! prevEntry TS %d, now TS %d", prevEntry.Timestamp, entry.Timestamp))
+		}
+		prevEntry = entry
 		receiver(entry, prevFileOffset)
 		prevFileOffset = readerFileOffset
 		entriesParsed += 1
@@ -176,9 +180,6 @@ func (st *SSTforTag) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
 		return sorted[i].Timestamp < sorted[j].Timestamp
 	})
 	minimalTimestamp := sorted[0].Timestamp
-	for _, e := range sorted {
-		minimalTimestamp = utils2.Min(minimalTimestamp, e.Timestamp)
-	}
 	if st.getCurrentMinTimestamp() != 0 {
 		if (minimalTimestamp >= st.getCurrentMaxTimestamp()) && (st.nextCompactionTimestamp > utils.GetNowMillis()) {
 			st.appendDataToEndOfTable(sorted)
@@ -218,15 +219,27 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 
 	//over sstable
 	st.iterateOverFileAndApplyForAllEntries(func(sstEntry Entry, o int64) {
-		if idx < len(commitlogEntries) {
+		banExistingEntry := false
+		for idx < len(commitlogEntries) {
 			commitlogEntry := commitlogEntries[idx]
-			if commitlogEntry.Timestamp < sstEntry.Timestamp {
+			if commitlogEntry.Timestamp <= sstEntry.Timestamp {
 				newSstEntry := Entry{Timestamp: commitlogEntry.Timestamp, ExpiresAt: commitlogEntry.ExpiresAt, Value: commitlogEntry.Value}
 				writeEntryToFile(newSstEntry, writer)
+				//log.Debug("write new %d", newSstEntry.Timestamp)
+				if commitlogEntry.Timestamp == sstEntry.Timestamp {
+					banExistingEntry = true
+				}
 				idx++
+			} else {
+				break
 			}
 		}
-		writeEntryToFile(sstEntry, writer)
+		if !banExistingEntry {
+			writeEntryToFile(sstEntry, writer)
+			//log.Debug("write exis %d", sstEntry.Timestamp)
+		} else {
+			log.Warn("Not writing old entry for tag %s ts %d as there is newer entry", st.Tag, sstEntry.Timestamp)
+		}
 	})
 
 	st.mutex.Lock()
@@ -290,8 +303,10 @@ func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 	ans := make([]Entry, 0)
 	countInFile := 0
 	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(e Entry, i int64) {
-		if (e.Timestamp > 0) && (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) && ((e.ExpiresAt == 0) || (e.ExpiresAt >= now)){
+		if (e.Timestamp > 0) && (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) && ((e.ExpiresAt == 0) || (e.ExpiresAt >= now)) {
 			ans = append(ans, e)
+		} else {
+			print("mismatch")
 		}
 		countInFile++
 	})
