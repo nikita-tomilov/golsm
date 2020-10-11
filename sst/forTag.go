@@ -204,8 +204,8 @@ func (st *SSTforTag) appendDataToEndOfTable(commitlogEntries []commitlog.Entry) 
 		st.index.ReplaceOrInsert(buildIndexEntry(sstEntry.Timestamp, offset, sstEntry.ExpiresAt))
 		offset += writeEntryToFile(sstEntry, writer)
 	}
-	//err = writer.Flush()
-	//st.file.Sync()
+	err = writer.Flush()
+	st.file.Sync()
 	utils.Check(err)
 	st.mutex.Unlock()
 }
@@ -254,8 +254,8 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 		idx += 1
 	}
 
-	//writer.Flush()
-	//copyFile.Sync()
+	writer.Flush()
+	copyFile.Sync()
 	copyFile.Close()
 
 	st.file.Close()
