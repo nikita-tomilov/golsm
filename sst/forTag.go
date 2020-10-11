@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+const DefaultSlicePreassignedMem = 0
+
 type SSTforTag struct {
 	Tag                     string
 	FileName                string
@@ -29,7 +31,7 @@ type SSTforTag struct {
 func (st *SSTforTag) InitStorage() {
 	dir, _ := filepath.Split(st.FileName)
 	os.MkdirAll(dir, os.ModePerm)
-	st.index = btree.New(10)
+	st.index = btree.New(4)
 	if st.PerformCompactionEvery == 0 {
 		st.PerformCompactionEvery = time.Minute * 10
 	}
@@ -68,7 +70,7 @@ func (st *SSTforTag) rebuildIndex() {
 }
 
 func (st *SSTforTag) GetAllEntries() []Entry {
-	ans := make([]Entry, 0)
+	ans := make([]Entry, 0, DefaultSlicePreassignedMem)
 	st.iterateOverFileAndApplyForAllEntries(func(e Entry, o int64) {
 		ans = append(ans, e)
 	})
@@ -160,7 +162,7 @@ func (st *SSTforTag) getCurrentMaxTimestamp() uint64 {
 }
 
 func (st *SSTforTag) performExpirationWithinIndex() {
-	toBeDeleted := make([]IndexEntry, 0)
+	toBeDeleted := make([]IndexEntry, 0, DefaultSlicePreassignedMem)
 	now := utils.GetNowMillis()
 	st.index.Ascend(func(i btree.Item) bool {
 		oe := i.(IndexEntry)
@@ -202,8 +204,8 @@ func (st *SSTforTag) appendDataToEndOfTable(commitlogEntries []commitlog.Entry) 
 		st.index.ReplaceOrInsert(buildIndexEntry(sstEntry.Timestamp, offset, sstEntry.ExpiresAt))
 		offset += writeEntryToFile(sstEntry, writer)
 	}
-	err = writer.Flush()
-	st.file.Sync()
+	//err = writer.Flush()
+	//st.file.Sync()
 	utils.Check(err)
 	st.mutex.Unlock()
 }
@@ -252,8 +254,8 @@ func (st *SSTforTag) addDataResortingTable(commitlogEntries []commitlog.Entry) {
 		idx += 1
 	}
 
-	writer.Flush()
-	copyFile.Sync()
+	//writer.Flush()
+	//copyFile.Sync()
 	copyFile.Close()
 
 	st.file.Close()
@@ -269,7 +271,7 @@ func (st *SSTforTag) GetEntriesWithoutIndex(fromTs uint64, toTs uint64) []Entry 
 	if st.index.Len() == 0 {
 		return []Entry{}
 	}
-	ans := make([]Entry, 0)
+	ans := make([]Entry, 0, DefaultSlicePreassignedMem)
 	now := utils.GetNowMillis()
 	st.iterateOverFileAndApplyForAllEntries(func(e Entry, o int64) {
 		if (e.Timestamp > 0) && (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) && ((e.ExpiresAt == 0) || (e.ExpiresAt >= now)) {
@@ -300,7 +302,7 @@ func (st *SSTforTag) GetEntriesWithIndex(fromTs uint64, toTs uint64) []Entry {
 		return true
 	})
 	st.mutex.Unlock()
-	ans := make([]Entry, 0)
+	ans := make([]Entry, 0, DefaultSlicePreassignedMem)
 	countInFile := 0
 	st.iterateOverFileAndApplyForEntries(firstOffset, count, func(e Entry, i int64) {
 		if (e.Timestamp > 0) && (e.Timestamp >= fromTs) && (e.Timestamp <= toTs) && ((e.ExpiresAt == 0) || (e.ExpiresAt >= now)) {

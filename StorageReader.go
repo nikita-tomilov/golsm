@@ -72,7 +72,7 @@ func (sr *StorageReader) retrieveDataForTag(tag string, from uint64, to uint64) 
 		dataFromMemt = memtForTag.Retrieve(from, to)
 	}
 
-	if (availMemtFrom >= from) || (availMemtTo <= to) {
+	if (availMemtFrom > from) || (availMemtTo < to) {
 		if sstForTag != nil {
 			dataFromSst := sstForTag.GetEntriesWithIndex(from, to)
 

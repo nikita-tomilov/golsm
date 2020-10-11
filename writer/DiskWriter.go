@@ -44,7 +44,7 @@ func (dbw *DiskWriter) Store(e commitlog.Entry) {
 func (dbw *DiskWriter) trySwitchCommitlog() {
 	dbw.mutex.Lock()
 	currentEntries := dbw.ClManager.RetrieveAll()
-	if len(currentEntries) >= 0 {
+	if len(currentEntries) > 0 {
 		log.Debug("Switching commitlogs")
 		dbw.ClManager.SwapCommitlogs()
 		dbw.ClManager.ClearPrevious()

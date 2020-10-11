@@ -14,8 +14,10 @@ type MemTforTag struct {
 	data            *btree.BTree
 }
 
+const DefaultSlicePreassignedMem = 0
+
 func (mt *MemTforTag) InitStorage() {
-	mt.data = btree.New(10)
+	mt.data = btree.New(4)
 	mt.mutex = &sync.Mutex{}
 }
 
@@ -60,7 +62,7 @@ func (mt *MemTforTag) Availability() (uint64, uint64) {
 
 func (mt *MemTforTag) Retrieve(fromTs uint64, toTs uint64) []Entry {
 	mt.mutex.Lock()
-	ans := make([]Entry, 0)
+	ans := make([]Entry, 0, DefaultSlicePreassignedMem)
 	mt.data.AscendRange(buildIndexKey(fromTs), buildIndexKey(toTs+1), func(i btree.Item) bool {
 		oe := i.(*Entry)
 		ans = append(ans, *oe)
@@ -72,7 +74,7 @@ func (mt *MemTforTag) Retrieve(fromTs uint64, toTs uint64) []Entry {
 
 func (mt *MemTforTag) PerformExpiration() {
 	mt.mutex.Lock()
-	toBeDeleted := make([]*Entry, 0)
+	toBeDeleted := make([]*Entry, 0, DefaultSlicePreassignedMem)
 	now := utils.GetNowMillis()
 	mt.data.Ascend(func(i btree.Item) bool {
 		oe := i.(*Entry)

@@ -22,7 +22,10 @@ func (e *Entry) ToString() string {
 func FromByteArray(arr []uint8) Entry {
 	timestamp := binary.LittleEndian.Uint64(arr)
 	expiresAt := binary.LittleEndian.Uint64(arr[8:])
-	value := arr[16:]
+	value := make([]byte, len(arr) - 16)
+	for i := 16; i < len(arr); i++ {
+		value[i - 16] = arr[i]
+	}
 	return Entry{
 		Timestamp: timestamp,
 		ExpiresAt: expiresAt,
@@ -30,18 +33,14 @@ func FromByteArray(arr []uint8) Entry {
 	}
 }
 
-func (e *Entry) ToByteArray() []uint8 {
-	entryLen := len(e.Value) + 8 + 8
-	arr := make([]byte, entryLen)
-	binary.LittleEndian.PutUint64(arr, e.Timestamp)
-	binary.LittleEndian.PutUint64(arr[8:], e.ExpiresAt)
-	copy(arr[16:], e.Value)
-	return arr
-}
-
 func (e *Entry) ToByteArrayWithLength() []uint8 {
-	dest := make([]byte, 2)
-	arr := e.ToByteArray()
-	binary.LittleEndian.PutUint16(dest, uint16(len(arr)))
-	return append(dest[:], arr[:]...)
+	entryLen := len(e.Value) + 8 + 8
+	arr := make([]byte, entryLen + 2)
+	binary.LittleEndian.PutUint64(arr[2:], e.Timestamp)
+	binary.LittleEndian.PutUint64(arr[10:], e.ExpiresAt)
+	for i := 18; i < len(arr); i++ {
+		arr[i] = e.Value[i - 18]
+	}
+	binary.LittleEndian.PutUint16(arr, uint16(entryLen))
+	return arr
 }
