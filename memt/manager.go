@@ -2,6 +2,8 @@ package memt
 
 import (
 	"github.com/nikita-tomilov/golsm/commitlog"
+	"github.com/nikita-tomilov/golsm/dto"
+	"github.com/nikita-tomilov/golsm/utils"
 	"sync"
 	"time"
 )
@@ -35,6 +37,14 @@ func (sm *Manager) InitStorage() {
 
 func (sm *Manager) CloseStorage() {
 	sm.shouldBeRunning = false
+}
+
+func (sm *Manager) MergeWithPrefetched(data map[string][]dto.Measurement) {
+	expiresAt := utils.GetNowMillis() + uint64(sm.PerformExpirationEvery.Milliseconds() * 10)
+	for tag, values := range data {
+		memtForTag := sm.MemTableForTag(tag)
+		memtForTag.MergeWithPrefetched(values, expiresAt)
+	}
 }
 
 func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
@@ -79,6 +89,16 @@ func (sm *Manager) Availability() (uint64, uint64) {
 		return 0, 0
 	}
 	return fromts, tots
+}
+
+func (sm *Manager) GetTags() []string {
+	keys := make([]string, len(sm.memtForTag))
+	i := 0
+	for k := range sm.memtForTag {
+		keys[i] = k
+		i++
+	}
+	return keys
 }
 
 func (sm *Manager) createMemtForTag(tag string) *MemTforTag {

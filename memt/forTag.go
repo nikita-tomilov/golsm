@@ -3,6 +3,7 @@ package memt
 import (
 	"github.com/google/btree"
 	"github.com/nikita-tomilov/golsm/commitlog"
+	"github.com/nikita-tomilov/golsm/dto"
 	"github.com/nikita-tomilov/golsm/utils"
 	"sync"
 )
@@ -27,6 +28,14 @@ func (mt *MemTforTag) MergeWithCommitlog(entries []commitlog.Entry) {
 		if string(entry.Key) == mt.Tag {
 			mt.save(entry.Timestamp, entry.ExpiresAt, entry.Value)
 		}
+	}
+	mt.mutex.Unlock()
+}
+
+func (mt *MemTforTag) MergeWithPrefetched(entries []dto.Measurement, expiresAt uint64) {
+	mt.mutex.Lock()
+	for _, entry := range entries {
+		mt.save(entry.Timestamp, expiresAt, entry.Value)
 	}
 	mt.mutex.Unlock()
 }

@@ -3,17 +3,23 @@ package sst
 import (
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/nikita-tomilov/golsm/commitlog"
+	"io/ioutil"
 	"sync"
 )
 
 type Manager struct {
-	RootDir string
+	RootDir   string
 	sstForTag map[string]*SSTforTag
-	mutex *sync.Mutex
+	mutex     *sync.Mutex
 }
 
 func (sm *Manager) InitStorage() {
 	sm.sstForTag = make(map[string]*SSTforTag)
+	files, _ := ioutil.ReadDir(sm.RootDir)
+	for _, f := range files {
+		tag := string(base58.Decode(f.Name()))
+		sm.SstForTag(tag)
+	}
 }
 
 func (sm *Manager) MergeWithCommitlog(commitlogEntries []commitlog.Entry) {
@@ -64,8 +70,18 @@ func (sm *Manager) SstForTag(tag string) *SSTforTag {
 }
 
 func (sm *Manager) createSstForTag(tag string) *SSTforTag {
-	sst := SSTforTag{Tag:tag, FileName:sm.RootDir + "/" + base58.Encode([]byte(tag))}
+	sst := SSTforTag{Tag: tag, FileName: sm.RootDir + "/" + base58.Encode([]byte(tag))}
 	sst.InitStorage()
 	sm.sstForTag[tag] = &sst
 	return &sst
+}
+
+func (sm *Manager) GetTags() []string {
+	keys := make([]string, len(sm.sstForTag))
+	i := 0
+	for k := range sm.sstForTag {
+		keys[i] = k
+		i++
+	}
+	return keys
 }

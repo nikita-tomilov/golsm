@@ -4,18 +4,39 @@ import (
 	"github.com/nikita-tomilov/golsm/dto"
 	"github.com/nikita-tomilov/golsm/memt"
 	"github.com/nikita-tomilov/golsm/sst"
+	"github.com/nikita-tomilov/golsm/utils"
 	"sort"
 	"sync"
+	"time"
 )
 
 type StorageReader struct {
 	SSTManager *sst.Manager
 	MemTable   *memt.Manager
+	MemtPrefetch time.Duration
 	mutex      *sync.Mutex
 }
 
 func (sr *StorageReader) Init() {
 	sr.mutex = &sync.Mutex{}
+	if (len(sr.SSTManager.GetTags()) > 0) && (sr.MemtPrefetch.Milliseconds() > 0) {
+		//i was initialized over existing storage; should prefetch some data to memt
+		sr.prefetch()
+	}
+}
+
+func (sr *StorageReader) prefetch() {
+	availFrom, availTo := sr.SSTManager.Availability()
+	if (availTo == 0) || (availFrom == 0) {
+		return
+	}
+
+	from := maxNotZero(availFrom, uint64(int64(availTo) - sr.MemtPrefetch.Milliseconds()))
+	to := availTo
+	tags := sr.SSTManager.GetTags()
+	data := sr.Retrieve(tags, from, to)
+
+	sr.MemTable.MergeWithPrefetched(data)
 }
 
 func (sr *StorageReader) Retrieve(tags []string, from uint64, to uint64) map[string][]dto.Measurement {
@@ -33,6 +54,12 @@ func (sr *StorageReader) Availability() (uint64, uint64) {
 	fromForSst, toForSst := sr.SSTManager.Availability()
 
 	return minNotZero(fromForMem, fromForSst), maxNotZero(toForMem, toForSst)
+}
+
+func (sr *StorageReader) GetTags() []string {
+	fromSst := sr.SSTManager.GetTags()
+	fromMemt := sr.MemTable.GetTags()
+	return utils.MergeWithoutDuplicates(fromSst, fromMemt)
 }
 
 func minNotZero(a uint64, b uint64) uint64 {
@@ -72,7 +99,7 @@ func (sr *StorageReader) retrieveDataForTag(tag string, from uint64, to uint64) 
 		dataFromMemt = memtForTag.Retrieve(from, to)
 	}
 
-	if (availMemtFrom > from) || (availMemtTo < to) {
+	if (availMemtFrom > from) || (availMemtTo < to) || (availMemtFrom == 0) || (availMemtTo == 0) {
 		if sstForTag != nil {
 			dataFromSst := sstForTag.GetEntriesWithIndex(from, to)
 

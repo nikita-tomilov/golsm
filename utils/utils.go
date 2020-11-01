@@ -70,3 +70,20 @@ func DoEvery(d time.Duration, f func()) {
 		f()
 	}
 }
+
+func MergeWithoutDuplicates(a []string, b []string) []string {
+	set := make(map[string]struct{})
+	for _, aa := range a {
+		set[aa] = struct{}{}
+	}
+	for _, bb := range b {
+		set[bb] = struct{}{}
+	}
+	keys := make([]string, len(set))
+	i := 0
+	for k := range set {
+		keys[i] = k
+		i++
+	}
+	return keys
+}
