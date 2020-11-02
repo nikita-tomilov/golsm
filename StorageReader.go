@@ -34,7 +34,7 @@ func (sr *StorageReader) prefetch() {
 	from := maxNotZero(availFrom, uint64(int64(availTo) - sr.MemtPrefetch.Milliseconds()))
 	to := availTo
 	tags := sr.SSTManager.GetTags()
-	data := sr.Retrieve(tags, from, to)
+	data := sr.retrieveFromSSTOnly(tags, from, to)
 
 	sr.MemTable.MergeWithPrefetched(data)
 }
@@ -44,6 +44,16 @@ func (sr *StorageReader) Retrieve(tags []string, from uint64, to uint64) map[str
 
 	for _, tag := range tags {
 		ans[tag] = sr.retrieveDataForTag(tag, from, to)
+	}
+
+	return ans
+}
+
+func (sr *StorageReader) retrieveFromSSTOnly(tags []string, from uint64, to uint64) map[string][]dto.Measurement {
+	ans := make(map[string][]dto.Measurement)
+
+	for _, tag := range tags {
+		ans[tag] = sr.retrieveDataForTagFromSSTableOnly(tag, from, to)
 	}
 
 	return ans
@@ -80,6 +90,30 @@ func maxNotZero(a uint64, b uint64) uint64 {
 		return a
 	}
 	return b
+}
+
+func (sr *StorageReader) retrieveDataForTagFromSSTableOnly(tag string, from uint64, to uint64) []dto.Measurement {
+	sstForTag := sr.SSTManager.SstForTag(tag)
+	timestampToValue := make(map[uint64][]byte)
+
+	dataFromSst := sstForTag.GetEntriesWithIndex(from, to)
+
+	for _, dfs := range dataFromSst {
+		timestampToValue[dfs.Timestamp] = dfs.Value
+	}
+
+	ans := make([]dto.Measurement, len(timestampToValue))
+	i := 0
+	for k, v := range timestampToValue {
+		ans[i] = dto.Measurement{Timestamp: k, Value: v}
+		i++
+	}
+
+	sort.Slice(ans, func(i, j int) bool {
+		return ans[i].Timestamp < ans[j].Timestamp
+	})
+
+	return ans
 }
 
 func (sr *StorageReader) retrieveDataForTag(tag string, from uint64, to uint64) []dto.Measurement {
