@@ -20,10 +20,10 @@ func (sw *StorageWriter) Init() {
 
 func (sw *StorageWriter) Store(data map[string][]dto.Measurement, expiresAt uint64) {
 	for tag, values := range data {
-		entries := make([]commitlog.Entry, 0)
-		for _, value := range values {
+		entries := make([]commitlog.Entry, len(values))
+		for i, value := range values {
 			e := commitlog.Entry{Key:[]byte(tag), Timestamp:value.Timestamp, ExpiresAt:expiresAt, Value:value.Value}
-			entries = append(entries, e)
+			entries[i] = e
 			sw.DiskWriter.Store(e)
 		}
 		sw.MemTable.MergeWithCommitlogForTag(tag, entries)
