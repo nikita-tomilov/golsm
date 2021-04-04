@@ -42,6 +42,13 @@ func (m *Manager) Store(entry Entry) {
 	active.Store(entry)
 }
 
+func (m *Manager) StoreMultiple(entries []Entry) {
+	active := m.getActiveCommitlog()
+	for _, entry := range entries {
+		active.Store(entry)
+	}
+}
+
 func (m *Manager) RetrieveAll() []Entry {
 	active := m.getActiveCommitlog()
 	return active.RetrieveAll()

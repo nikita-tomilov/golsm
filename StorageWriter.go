@@ -24,8 +24,8 @@ func (sw *StorageWriter) Store(data map[string][]dto.Measurement, expiresAt uint
 		for i, value := range values {
 			e := commitlog.Entry{Key:[]byte(tag), Timestamp:value.Timestamp, ExpiresAt:expiresAt, Value:value.Value}
 			entries[i] = e
-			sw.DiskWriter.Store(e)
 		}
+		sw.DiskWriter.StoreMultiple(entries)
 		sw.MemTable.MergeWithCommitlogForTag(tag, entries)
 	}
 }

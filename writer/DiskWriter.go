@@ -41,6 +41,18 @@ func (dbw *DiskWriter) Store(e commitlog.Entry) {
 	}
 }
 
+func (dbw *DiskWriter) StoreMultiple(e []commitlog.Entry) {
+	dbw.mutex.Lock()
+	dbw.ClManager.StoreMultiple(e)
+	dbw.currentEntries += len(e)
+
+	dbw.mutex.Unlock()
+	if dbw.currentEntries >= dbw.EntriesPerCommitlog {
+		dbw.trySwitchCommitlog()
+		dbw.currentEntries = 0
+	}
+}
+
 func (dbw *DiskWriter) trySwitchCommitlog() {
 	dbw.mutex.Lock()
 	currentEntries := dbw.ClManager.RetrieveAll()
