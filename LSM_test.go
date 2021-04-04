@@ -86,6 +86,47 @@ func TestLSM_StorageReaderWorks(t *testing.T) {
 	}
 }
 
+func TestLSM_StorageWriterBatchingWorks(t *testing.T) {
+	//given
+	clm := commitlog.Manager{Path: fmt.Sprintf("/tmp/golsm_test/diskwriter/commitlog-%d-%d", utils.GetNowMillis(), utils.GetTestIdx())}
+	sstm := sst.Manager{RootDir: fmt.Sprintf("/tmp/golsm_test/diskwriter/sstm-%d-%d", utils.GetNowMillis(), utils.GetTestIdx())}
+	dw := writer.DiskWriter{SstManager: &sstm, ClManager: &clm, EntriesPerCommitlog: 10, PeriodBetweenFlushes: 5 * time.Second}
+	dw.Init()
+
+	memtm := memt.Manager{MaxEntriesPerTag: 9999}
+	memtm.InitStorage()
+
+	storageWriter := StorageWriter{MemTable: &memtm, DiskWriter: &dw}
+	storageWriter.Init()
+	const tagName = "whatever"
+	const expiration = 0
+
+	dummyData := buildDummyData(25)
+
+	//when
+	storageWriter.StoreBatch(sliceAndToBatch(dummyData, tagName, 0, 16), expiration)
+	time.Sleep(1 * time.Second)
+	storageWriter.StoreBatch(sliceAndToBatch(dummyData, tagName, 16, 20), expiration)
+	time.Sleep(1 * time.Second)
+	storageWriter.StoreBatch(sliceAndToBatch(dummyData, tagName, 20, 25), expiration)
+	time.Sleep(10 * time.Second)
+
+	storedDataOnDisk := sstm.SstForTag(tagName).GetAllEntries()
+	storedDataInMemT := memtm.MemTableForTag(tagName).RetrieveAll()
+
+	//then
+	assert.Equal(t, len(dummyData), len(storedDataOnDisk), "some dto was lost")
+	assert.Equal(t, len(dummyData), len(storedDataInMemT), "some dto was lost")
+	for i := 0; i < 25; i++ {
+		assert.Equal(t, dummyData[i].Timestamp, storedDataOnDisk[i].Timestamp, "entry timestamp incorrect")
+		assert.Equal(t, dummyData[i].Value, storedDataOnDisk[i].Value, "entry value incorrect")
+
+		assert.Equal(t, dummyData[i].Timestamp, storedDataInMemT[i].Timestamp, "entry timestamp incorrect")
+		assert.Equal(t, dummyData[i].Value, storedDataInMemT[i].Value, "entry value incorrect")
+	}
+}
+
+
 func TestLSM_StorageReaderOnBigDataTest(t *testing.T) {
 	storageReader, storageWriter := InitStorage(
 		fmt.Sprintf("/tmp/golsm_test/diskwriter/commitlog-%d-%d", utils.GetNowMillis(), utils.GetTestIdx()),
@@ -150,6 +191,14 @@ func slice(data []dto.Measurement, tag string, from int, to int) map[string][]dt
 	ans[tag] = make([]dto.Measurement, 0)
 	for i := from; i < to; i++ {
 		ans[tag] = append(ans[tag], data[i])
+	}
+	return ans
+}
+
+func sliceAndToBatch(data []dto.Measurement, tag string, from int, to int) []dto.TaggedMeasurement {
+	ans := make([]dto.TaggedMeasurement, 0)
+	for i := from; i < to; i++ {
+		ans = append(ans, dto.TaggedMeasurement{Tag:tag, Timestamp:data[i].Timestamp, Value:data[i].Value})
 	}
 	return ans
 }
